@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest an improvement to VoxRelay AI
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: input
+    id: problem
+    attributes:
+      label: Problem statement
+      placeholder: What real operational problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: Describe the user workflow, API shape, or system behavior you want
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and constraints
+      placeholder: Call out multi-tenancy, security, auditability, provider boundaries, or demo-mode constraints

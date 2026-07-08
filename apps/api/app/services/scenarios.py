@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(frozen=True)
+class Scenario:
+    key: str
+    label: str
+    caller_name: str
+    caller_phone: str
+    agent_id: str
+    lead: dict[str, Any]
+    outcome: str
+    quality: dict[str, Any]
+    events: list[dict[str, Any]]
+
+BASE_AGENT = "agent-realestate"
+
+SCENARIOS: dict[str, Scenario] = {
+    "real_estate_buyer": Scenario(
+        key="real_estate_buyer", label="Real-estate buyer inquiry", caller_name="Maya Chen", caller_phone="+1 (555) 014-2288", agent_id="agent-realestate",
+        lead={"name":"Maya Chen","phone":"+1 (555) 014-2288","email":"maya.chen@example.test","service_type":"Buyer consultation","urgency":"normal","location":"Riverside district","preferred_time":"Thursday 15:30","score":91,"status":"qualified","tags":["buyer","high-intent"],"owner":"Acquisitions Team"},
+        outcome="qualified", quality={"score":94,"completeness":98,"hallucination_risk":"low","policy_risk":"low","latency_ms":780,"sentiment":"improving","findings":["Clear buyer intent captured.","Viewing preference confirmed."]},
+        events=[
+            {"type":"state_changed","state":"listening","note":"Inbound call connected"},
+            {"type":"transcript","speaker":"agent","text":"Thanks for calling Northstar Realty. This call may be recorded for service quality. Is that okay?","confidence":0.99},
+            {"type":"transcript","speaker":"caller","text":"Yes. I am looking to buy a three-bedroom home near Riverside and would like to view a few options this week.","confidence":0.98},
+            {"type":"state_changed","state":"reasoning","note":"Intent identified: buyer consultation"},
+            {"type":"field_extracted","field":"service_type","value":"Buyer consultation","confidence":0.98},
+            {"type":"field_extracted","field":"location","value":"Riverside district","confidence":0.94},
+            {"type":"transcript","speaker":"agent","text":"Absolutely. May I get your name and a preferred day for a consultation?","confidence":0.99},
+            {"type":"transcript","speaker":"caller","text":"Maya Chen. Thursday afternoon would be ideal. You can email maya.chen@example.test.","confidence":0.97},
+            {"type":"field_extracted","field":"email","value":"maya.chen@example.test","confidence":0.97},
+            {"type":"state_changed","state":"speaking","note":"Qualification complete"},
+            {"type":"completed","summary":"High-intent buyer consultation request; lead routed to Acquisitions Team."},
+        ]),
+    "clinic_booking": Scenario(
+        key="clinic_booking", label="Clinic appointment booking", caller_name="Jordan Williams", caller_phone="+1 (555) 013-9914", agent_id="agent-clinic",
+        lead={"name":"Jordan Williams","phone":"+1 (555) 013-9914","email":"jordan.williams@example.test","service_type":"Primary care consultation","urgency":"normal","location":"Downtown clinic","preferred_time":"Wednesday 10:00","score":86,"status":"appointment_booked","tags":["new-patient","booked"],"owner":"Downtown Clinic Intake"},
+        outcome="booked", quality={"score":96,"completeness":100,"hallucination_risk":"low","policy_risk":"low","latency_ms":690,"sentiment":"stable","findings":["Consent recorded.","Booking confirmation read back to caller."]},
+        events=[
+            {"type":"state_changed","state":"listening","note":"Inbound call connected"},
+            {"type":"transcript","speaker":"agent","text":"Welcome to Meridian Clinic. This call may be recorded. Do I have your permission to continue?","confidence":0.99},
+            {"type":"transcript","speaker":"caller","text":"Yes. I need a new patient appointment for persistent headaches, preferably Wednesday morning.","confidence":0.96},
+            {"type":"state_changed","state":"transcribing","note":"Streaming patient request"},
+            {"type":"field_extracted","field":"service_type","value":"Primary care consultation","confidence":0.91},
+            {"type":"field_extracted","field":"urgency","value":"normal","confidence":0.88},
+            {"type":"transcript","speaker":"agent","text":"I can offer Wednesday at 10:00 AM with our intake clinician. Does that work?","confidence":0.99},
+            {"type":"transcript","speaker":"caller","text":"Yes, please book it. My name is Jordan Williams and my email is jordan.williams@example.test.","confidence":0.98},
+            {"type":"state_changed","state":"booking","note":"Checking mock calendar availability"},
+            {"type":"booking","status":"confirmed","slot":"Wednesday 10:00","calendar":"Mock Google Calendar"},
+            {"type":"completed","summary":"New-patient primary care consultation booked for Wednesday at 10:00 AM."},
+        ]),
+    "plumbing_emergency": Scenario(
+        key="plumbing_emergency", label="Plumbing emergency", caller_name="Eleanor Brooks", caller_phone="+1 (555) 019-7712", agent_id="agent-services",
+        lead={"name":"Eleanor Brooks","phone":"+1 (555) 019-7712","email":"","service_type":"Emergency plumbing","urgency":"emergency","location":"145 Willow Lane","preferred_time":"Immediate","score":99,"status":"needs_follow_up","tags":["emergency","handoff"],"owner":"Emergency Dispatch"},
+        outcome="escalated", quality={"score":92,"completeness":91,"hallucination_risk":"low","policy_risk":"low","latency_ms":560,"sentiment":"distressed_to_supported","findings":["Emergency phrase detected.","Human dispatch transfer completed."]},
+        events=[
+            {"type":"state_changed","state":"listening","note":"Inbound call connected"},
+            {"type":"transcript","speaker":"caller","text":"There is water pouring through my ceiling and I cannot shut it off. I need someone now.","confidence":0.99},
+            {"type":"state_changed","state":"escalating","note":"Emergency keyword policy triggered"},
+            {"type":"field_extracted","field":"urgency","value":"emergency","confidence":0.99},
+            {"type":"transcript","speaker":"agent","text":"I am connecting you to our emergency dispatch team now. If there is electrical danger, please move to a safe area and contact emergency services.","confidence":0.99},
+            {"type":"handoff","team":"Emergency Dispatch","destination":"+1 (555) 010-9110","status":"connected"},
+            {"type":"completed","summary":"Water leak emergency escalated to on-call dispatch; caller advised on immediate safety."},
+        ]),
+    "property_maintenance": Scenario(
+        key="property_maintenance", label="Property-maintenance request", caller_name="Samir Patel", caller_phone="+1 (555) 015-4008", agent_id="agent-property",
+        lead={"name":"Samir Patel","phone":"+1 (555) 015-4008","email":"samir.patel@example.test","service_type":"Heating maintenance","urgency":"high","location":"Oakview Apartments, Unit 4B","preferred_time":"Friday 13:00","score":78,"status":"qualified","tags":["tenant","maintenance"],"owner":"Property Operations"},
+        outcome="qualified", quality={"score":90,"completeness":94,"hallucination_risk":"low","policy_risk":"low","latency_ms":730,"sentiment":"stable","findings":["Unit and issue captured.","Work-order webhook queued."]},
+        events=[
+            {"type":"state_changed","state":"listening","note":"Inbound call connected"},
+            {"type":"transcript","speaker":"agent","text":"You have reached Oakview resident support. This call may be recorded for service improvement. How can I help?","confidence":0.99},
+            {"type":"transcript","speaker":"caller","text":"The heater in Unit 4B is cycling off. I work from home and would prefer Friday afternoon.","confidence":0.95},
+            {"type":"state_changed","state":"reasoning","note":"Maintenance workflow selected"},
+            {"type":"field_extracted","field":"location","value":"Oakview Apartments, Unit 4B","confidence":0.97},
+            {"type":"field_extracted","field":"service_type","value":"Heating maintenance","confidence":0.94},
+            {"type":"transcript","speaker":"agent","text":"I have created a maintenance request and the property operations team will confirm the Friday window by text.","confidence":0.99},
+            {"type":"completed","summary":"Heating maintenance request created; follow-up assigned to Property Operations."},
+        ]),
+    "insurance_claim": Scenario(
+        key="insurance_claim", label="Insurance claim intake", caller_name="Nina Alvarez", caller_phone="+1 (555) 016-2145", agent_id="agent-insurance",
+        lead={"name":"Nina Alvarez","phone":"+1 (555) 016-2145","email":"nina.alvarez@example.test","service_type":"Auto claim intake","urgency":"high","location":"East bridge interchange","preferred_time":"Today","score":82,"status":"qualified","tags":["claim","priority"],"owner":"Claims Intake"},
+        outcome="transferred", quality={"score":88,"completeness":89,"hallucination_risk":"low","policy_risk":"medium","latency_ms":850,"sentiment":"recovering","findings":["Coverage questions deferred to licensed claims specialist.","Claim triage summary delivered." ]},
+        events=[
+            {"type":"state_changed","state":"listening","note":"Inbound call connected"},
+            {"type":"transcript","speaker":"caller","text":"I was in a minor car accident. Everyone is safe, but I need to report it and understand what to do next.","confidence":0.97},
+            {"type":"state_changed","state":"reasoning","note":"Claims intake policy selected"},
+            {"type":"transcript","speaker":"agent","text":"I can collect the incident details and connect you with a licensed claims specialist. I cannot determine coverage over this call.","confidence":0.99},
+            {"type":"field_extracted","field":"service_type","value":"Auto claim intake","confidence":0.98},
+            {"type":"handoff","team":"Claims Intake","destination":"claims-queue","status":"queued"},
+            {"type":"completed","summary":"Auto claim intake completed; coverage question safely deferred to claims specialist."},
+        ]),
+    "low_confidence": Scenario(
+        key="low_confidence", label="Low-confidence / unclear customer call", caller_name="Unknown caller", caller_phone="+1 (555) 018-0000", agent_id="agent-services",
+        lead={"name":"Unknown caller","phone":"+1 (555) 018-0000","email":"","service_type":"Unclear","urgency":"unknown","location":"","preferred_time":"","score":22,"status":"needs_follow_up","tags":["low-confidence","review"],"owner":"Human Review Queue"},
+        outcome="needs_review", quality={"score":52,"completeness":43,"hallucination_risk":"low","policy_risk":"medium","latency_ms":1190,"sentiment":"unclear","findings":["Low transcription confidence across 3 segments.","No appointment or promise made.","Human review task created."]},
+        events=[
+            {"type":"state_changed","state":"listening","note":"Inbound call connected"},
+            {"type":"transcript","speaker":"caller","text":"Uh… I need help with the thing at the place… it keeps making that sound.","confidence":0.48},
+            {"type":"state_changed","state":"transcribing","note":"Low ASR confidence detected"},
+            {"type":"transcript","speaker":"agent","text":"I want to make sure I understand correctly. Could you tell me the address and the type of issue?","confidence":0.99},
+            {"type":"transcript","speaker":"caller","text":"I don’t know, maybe later. It is not working. Bye.","confidence":0.54},
+            {"type":"state_changed","state":"escalating","note":"Low-confidence review queue policy triggered"},
+            {"type":"completed","summary":"Caller abandoned after incomplete low-confidence intake. No booking created; review task opened."},
+        ]),
+}
