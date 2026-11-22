@@ -1,0 +1,12 @@
+sequence,timestamp_s,event_type,speaker,confidence,detail
+0,0.0,state_changed,system,,Inbound call connected
+1,2.794961,transcript,agent,0.99,Welcome to Meridian Clinic. This call may be recorded. Do I have your permission to continue?
+2,5.589923,transcript,caller,0.96,"Yes. I need a new patient appointment for persistent headaches, preferably Wednesday morning."
+3,8.384884,state_changed,system,,Streaming patient request
+4,11.179846,field_extracted,system,0.91,
+5,13.974807,field_extracted,system,0.88,
+6,16.769769,transcript,agent,0.99,I can offer Wednesday at 10:00 AM with our intake clinician. Does that work?
+7,19.56473,transcript,caller,0.98,"Yes, please book it. My name is Jordan Williams and my email is jordan.williams@example.test."
+8,22.359692,state_changed,system,,Checking mock calendar availability
+9,25.154653,booking,system,,
+10,27.949615,completed,system,,

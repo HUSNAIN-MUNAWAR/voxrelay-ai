@@ -83,10 +83,19 @@ def create_simulated_call(
         status="queued",
         outcome="in_progress",
         consent_state="pending",
-        metadata_json={"synthetic": True, "scenario_label": scenario.label, "provider_mode": "deterministic_local", "trace_id": f"trace-{call_id}"},
+        metadata_json={
+            "synthetic": True,
+            "scenario_label": scenario.label,
+            "provider_mode": "deterministic_local",
+            "trace_id": f"trace-{call_id}",
+        },
     )
     db.add(call)
-    _append_event(db, call, {"type": "state_changed", "state": "queued", "note": "Local deterministic call created"})
+    _append_event(
+        db,
+        call,
+        {"type": "state_changed", "state": "queued", "note": "Local deterministic call created"},
+    )
     db.add(
         AuditEvent(
             id=f"audit-{uuid4().hex[:10]}",
@@ -105,7 +114,15 @@ def create_simulated_call(
 
 def _persist_entities(db: Session, call: CallSession, scenario: Scenario) -> None:
     for field, value in scenario.lead.items():
-        if field not in {"name", "phone", "email", "service_type", "urgency", "location", "preferred_time"}:
+        if field not in {
+            "name",
+            "phone",
+            "email",
+            "service_type",
+            "urgency",
+            "location",
+            "preferred_time",
+        }:
             continue
         db.add(
             ExtractedEntity(
@@ -118,7 +135,9 @@ def _persist_entities(db: Session, call: CallSession, scenario: Scenario) -> Non
                 source_segment_id=None,
                 validation_state="rule_assisted",
                 pii_classification=PII_FIELDS.get(field, "none"),
-                crm_mapping_status="mapped" if field in {"name", "phone", "email", "service_type"} else "not_required",
+                crm_mapping_status="mapped"
+                if field in {"name", "phone", "email", "service_type"}
+                else "not_required",
             )
         )
 
@@ -147,7 +166,9 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
     _persist_entities(db, call, scenario)
 
     if scenario.outcome == "booked":
-        start = datetime.utcnow().replace(minute=0, second=0, microsecond=0) + timedelta(days=1, hours=10)
+        start = datetime.utcnow().replace(minute=0, second=0, microsecond=0) + timedelta(
+            days=1, hours=10
+        )
         db.add(
             Appointment(
                 id=f"apt-{uuid4().hex[:12]}",
@@ -181,7 +202,11 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
     call.duration_seconds = max(48, len(scenario.events) * 8)
     call.lead_score = lead_data["score"]
     call.quality_score = q["score"]
-    call.consent_state = "granted" if scenario.key not in {"plumbing_emergency", "low_confidence"} else "not_captured"
+    call.consent_state = (
+        "granted"
+        if scenario.key not in {"plumbing_emergency", "low_confidence"}
+        else "not_captured"
+    )
     call.escalation_level = (
         "emergency"
         if scenario.outcome == "escalated"
@@ -205,7 +230,11 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
                 action="routing.rule_evaluated",
                 entity_type="call",
                 entity_id=call.id,
-                detail={"rule_id": decision.rule_id, "destination": decision.destination, "synthetic": True},
+                detail={
+                    "rule_id": decision.rule_id,
+                    "destination": decision.destination,
+                    "synthetic": True,
+                },
             )
         )
     if scenario.outcome in {"escalated", "needs_review", "transferred"}:
@@ -213,9 +242,13 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
             Alert(
                 id=f"alert-{uuid4().hex[:12]}",
                 organization_id=call.organization_id,
-                category="emergency_detected" if scenario.outcome == "escalated" else "human_review_required",
+                category="emergency_detected"
+                if scenario.outcome == "escalated"
+                else "human_review_required",
                 severity="critical" if scenario.outcome == "escalated" else "medium",
-                title="Emergency escalation detected" if scenario.outcome == "escalated" else "Call requires human review",
+                title="Emergency escalation detected"
+                if scenario.outcome == "escalated"
+                else "Call requires human review",
                 detail="Created by deterministic local simulation. No external notification was sent.",
                 status="open",
                 entity_type="call",
@@ -229,7 +262,9 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
                 organization_id=call.organization_id,
                 lead_id=lead.id,
                 call_id=call.id,
-                task_type="emergency_follow_up" if scenario.outcome == "escalated" else "review_transcript",
+                task_type="emergency_follow_up"
+                if scenario.outcome == "escalated"
+                else "review_transcript",
                 title="Review deterministic call outcome",
                 assignee=decision.destination if decision.matched else "Human Review Queue",
                 due_at=datetime.utcnow() + timedelta(minutes=10),
@@ -244,7 +279,11 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
         idempotency_key=f"call-{call.id}-crm-sync",
         simulate_failure=scenario.key == "insurance_claim",
     )
-    _append_event(db, call, {"type": "state_changed", "state": "completed", "note": "Call completed and persisted"})
+    _append_event(
+        db,
+        call,
+        {"type": "state_changed", "state": "completed", "note": "Call completed and persisted"},
+    )
     db.add(
         AuditEvent(
             id=f"audit-{uuid4().hex[:10]}",
@@ -262,7 +301,11 @@ def persist_completion(db: Session, call: CallSession, scenario: Scenario) -> No
 async def stream_scenario(db: Session, call: CallSession):
     scenario = SCENARIOS.get(call.scenario, SCENARIOS["clinic_booking"])
     call.status = "ringing"
-    _append_event(db, call, {"type": "state_changed", "state": "ringing", "note": "Local simulation is ringing"})
+    _append_event(
+        db,
+        call,
+        {"type": "state_changed", "state": "ringing", "note": "Local simulation is ringing"},
+    )
     db.commit()
     for index, raw in enumerate(scenario.events):
         await asyncio.sleep(0.30 if raw["type"] == "transcript" else 0.16)

@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-11-22T19:32:33.294514+00:00",
+  "environment": {
+    "os": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.10",
+    "opencv": "4.13.0"
+  },
+  "scenario": {
+    "name": "clinic_booking",
+    "call_id": "call-6b14cf74cb35",
+    "status": "completed",
+    "events": 11,
+    "synthetic": true,
+    "provider_mode": "deterministic_local"
+  },
+  "audio": {
+    "provider": "Windows System.Speech",
+    "voice": "Microsoft Zira Desktop",
+    "channels": 1,
+    "sample_rate_hz": 22050,
+    "sample_width_bytes": 2,
+    "frames": 616289,
+    "duration_s": 27.949615
+  },
+  "artifacts": {
+    "audio_wav": {
+      "path": "docs/runtime_evidence/voxrelay-sapi-call.wav",
+      "bytes": 1232624,
+      "sha256": "f2baa6ad05be878979dbec2a4291eb70ad6a1c437d7ed3adde7a32bdeb20d623"
+    },
+    "animation_mp4": {
+      "path": "docs/runtime_evidence/voxrelay-call-runtime-animation.mp4",
+      "bytes": 8727140,
+      "sha256": "6b14aac69c22814313c54f46e094fdfc01e705981d630f4b1b3682243fe36623"
+    },
+    "poster_jpg": {
+      "path": "docs/runtime_evidence/voxrelay-call-runtime-poster.jpg",
+      "bytes": 76968,
+      "sha256": "f94e59841718e7395c335efdeb305cc3e72e513c679c93c81e10b6f42c475b5d"
+    },
+    "event_trace_csv": {
+      "path": "docs/runtime_evidence/voxrelay-call-event-trace.csv",
+      "bytes": 891,
+      "sha256": "4b9e5afdefa171a3ce2c031cc19a4a3e91493cd0025ddcadca312e9b1ac45db3"
+    }
+  },
+  "encoded_animation": {
+    "frames": 420,
+    "fps": 15.0,
+    "width": 960,
+    "height": 540
+  },
+  "claim_boundary": [
+    "The simulator persisted a real local call, transcript segments, and ordered event records before evidence generation.",
+    "The WAV was synthesized by the installed Windows System.Speech Microsoft Zira Desktop voice from the persisted synthetic transcript.",
+    "The MP4 is a waveform and event-timeline animation derived from that emitted WAV and persisted event trace; it has no audio track.",
+    "This is not neural TTS, speech recognition, an external telephony call, an external LLM, or a production benchmark.",
+    "No customer audio, private data, or fabricated provider result is used."
+  ]
+}

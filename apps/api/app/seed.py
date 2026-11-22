@@ -50,23 +50,89 @@ ORGS = [
 ]
 
 AGENTS = [
-    ("agent-realestate", "org-northstar", "Aster — Buyer Concierge", "Real-estate lead qualification", "Aurora"),
-    ("agent-clinic", "org-carebridge", "Mira — Patient Intake", "Clinic appointment booking", "Juniper"),
+    (
+        "agent-realestate",
+        "org-northstar",
+        "Aster — Buyer Concierge",
+        "Real-estate lead qualification",
+        "Aurora",
+    ),
+    (
+        "agent-clinic",
+        "org-carebridge",
+        "Mira — Patient Intake",
+        "Clinic appointment booking",
+        "Juniper",
+    ),
     ("agent-services", "org-apex", "Relay — Emergency Dispatch", "Home services intake", "Sol"),
-    ("agent-property", "org-northstar", "Haven — Resident Support", "Property maintenance", "Willow"),
-    ("agent-insurance", "org-carebridge", "Atlas — Claims Intake", "Insurance claim intake", "Nova"),
+    (
+        "agent-property",
+        "org-northstar",
+        "Haven — Resident Support",
+        "Property maintenance",
+        "Willow",
+    ),
+    (
+        "agent-insurance",
+        "org-carebridge",
+        "Atlas — Claims Intake",
+        "Insurance claim intake",
+        "Nova",
+    ),
 ]
 
 USERS = [
-    ("user-demo-admin", "org-northstar", "admin@voxrelay.demo", "Demo Administrator", "organization_admin"),
-    ("user-demo-ops", "org-carebridge", "ops@voxrelay.demo", "Operations Manager", "operations_manager"),
-    ("user-demo-supervisor", "org-northstar", "supervisor@voxrelay.demo", "Supervisor", "supervisor"),
-    ("user-demo-quality", "org-carebridge", "quality@voxrelay.demo", "Quality Reviewer", "quality_reviewer"),
+    (
+        "user-demo-admin",
+        "org-northstar",
+        "admin@voxrelay.demo",
+        "Demo Administrator",
+        "organization_admin",
+    ),
+    (
+        "user-demo-ops",
+        "org-carebridge",
+        "ops@voxrelay.demo",
+        "Operations Manager",
+        "operations_manager",
+    ),
+    (
+        "user-demo-supervisor",
+        "org-northstar",
+        "supervisor@voxrelay.demo",
+        "Supervisor",
+        "supervisor",
+    ),
+    (
+        "user-demo-quality",
+        "org-carebridge",
+        "quality@voxrelay.demo",
+        "Quality Reviewer",
+        "quality_reviewer",
+    ),
     ("user-demo-scheduler", "org-carebridge", "scheduler@voxrelay.demo", "Scheduler", "scheduler"),
-    ("user-demo-sales", "org-northstar", "sales@voxrelay.demo", "Sales Representative", "sales_representative"),
-    ("user-demo-compliance", "org-apex", "compliance@voxrelay.demo", "Compliance Reviewer", "compliance_reviewer"),
+    (
+        "user-demo-sales",
+        "org-northstar",
+        "sales@voxrelay.demo",
+        "Sales Representative",
+        "sales_representative",
+    ),
+    (
+        "user-demo-compliance",
+        "org-apex",
+        "compliance@voxrelay.demo",
+        "Compliance Reviewer",
+        "compliance_reviewer",
+    ),
     ("user-demo-viewer", "org-apex", "viewer@voxrelay.demo", "Viewer", "viewer"),
-    ("user-demo-agentmanager", "org-carebridge", "agentmanager@voxrelay.demo", "Voice Agent Manager", "voice_agent_manager"),
+    (
+        "user-demo-agentmanager",
+        "org-carebridge",
+        "agentmanager@voxrelay.demo",
+        "Voice Agent Manager",
+        "voice_agent_manager",
+    ),
 ]
 
 CONFIG = {
@@ -206,8 +272,14 @@ def seed_demo(db: Session) -> None:
                 version_number=version_number,
                 status=status,
                 config_snapshot=config,
-                release_notes=("Baseline active synthetic demo version" if version_number == 3 else "Improves explicit booking-failure fallback."),
-                owner_id="user-demo-agentmanager" if org_id == "org-carebridge" else "user-demo-admin",
+                release_notes=(
+                    "Baseline active synthetic demo version"
+                    if version_number == 3
+                    else "Improves explicit booking-failure fallback."
+                ),
+                owner_id="user-demo-agentmanager"
+                if org_id == "org-carebridge"
+                else "user-demo-admin",
                 evaluation_summary={"pass_rate": 97.5, "critical_failures": 0, "synthetic": True},
                 release_gates={
                     "required_scenarios_passed": True,
@@ -272,18 +344,117 @@ def seed_demo(db: Session) -> None:
         )
 
     routing_rules = [
-        ("route-emergency", "org-apex", "Emergency escalation", {"urgency": "emergency"}, 1, "human_team", "Emergency Dispatch", "Create incident task"),
-        ("route-low-confidence", "org-northstar", "Low-confidence review", {"confidence_below": 0.65}, 2, "queue", "Human Review Queue", "Create callback task"),
-        ("route-clinic-booking", "org-carebridge", "Clinic booking failure", {"booking_failed": True}, 3, "human_team", "Clinic Intake", "Create scheduler task"),
-        ("route-insurance-restricted", "org-carebridge", "Restricted claims guidance", {"restricted_topic": True}, 2, "human_team", "Claims Intake", "Escalate to compliance"),
-        ("route-after-hours", "org-northstar", "After-hours callback", {"business_hours": False}, 5, "callback", "Next business day callback", "Notify sales"),
-        ("route-language", "org-northstar", "Language routing", {"language": "es"}, 4, "queue", "Bilingual Support", "Create callback task"),
-        ("route-vip", "org-northstar", "VIP routing placeholder", {"vip": True}, 1, "human_team", "Property Sales", "Notify supervisor"),
-        ("route-sentiment", "org-apex", "Sentiment-risk escalation", {"sentiment_risk": True}, 2, "queue", "Emergency Dispatch Queue", "Notify supervisor"),
-        ("route-crm-failure", "org-carebridge", "CRM failure recovery", {"crm_failed": True}, 5, "queue", "Clinic Intake Queue", "Create CRM retry job"),
-        ("route-no-answer", "org-northstar", "No-answer callback", {"no_answer": True}, 8, "callback", "Sales follow-up", "Create callback task"),
+        (
+            "route-emergency",
+            "org-apex",
+            "Emergency escalation",
+            {"urgency": "emergency"},
+            1,
+            "human_team",
+            "Emergency Dispatch",
+            "Create incident task",
+        ),
+        (
+            "route-low-confidence",
+            "org-northstar",
+            "Low-confidence review",
+            {"confidence_below": 0.65},
+            2,
+            "queue",
+            "Human Review Queue",
+            "Create callback task",
+        ),
+        (
+            "route-clinic-booking",
+            "org-carebridge",
+            "Clinic booking failure",
+            {"booking_failed": True},
+            3,
+            "human_team",
+            "Clinic Intake",
+            "Create scheduler task",
+        ),
+        (
+            "route-insurance-restricted",
+            "org-carebridge",
+            "Restricted claims guidance",
+            {"restricted_topic": True},
+            2,
+            "human_team",
+            "Claims Intake",
+            "Escalate to compliance",
+        ),
+        (
+            "route-after-hours",
+            "org-northstar",
+            "After-hours callback",
+            {"business_hours": False},
+            5,
+            "callback",
+            "Next business day callback",
+            "Notify sales",
+        ),
+        (
+            "route-language",
+            "org-northstar",
+            "Language routing",
+            {"language": "es"},
+            4,
+            "queue",
+            "Bilingual Support",
+            "Create callback task",
+        ),
+        (
+            "route-vip",
+            "org-northstar",
+            "VIP routing placeholder",
+            {"vip": True},
+            1,
+            "human_team",
+            "Property Sales",
+            "Notify supervisor",
+        ),
+        (
+            "route-sentiment",
+            "org-apex",
+            "Sentiment-risk escalation",
+            {"sentiment_risk": True},
+            2,
+            "queue",
+            "Emergency Dispatch Queue",
+            "Notify supervisor",
+        ),
+        (
+            "route-crm-failure",
+            "org-carebridge",
+            "CRM failure recovery",
+            {"crm_failed": True},
+            5,
+            "queue",
+            "Clinic Intake Queue",
+            "Create CRM retry job",
+        ),
+        (
+            "route-no-answer",
+            "org-northstar",
+            "No-answer callback",
+            {"no_answer": True},
+            8,
+            "callback",
+            "Sales follow-up",
+            "Create callback task",
+        ),
     ]
-    for rule_id, org_id, name, condition, priority, destination_type, destination, fallback in routing_rules:
+    for (
+        rule_id,
+        org_id,
+        name,
+        condition,
+        priority,
+        destination_type,
+        destination,
+        fallback,
+    ) in routing_rules:
         ensure(
             db,
             RoutingRule,
@@ -301,12 +472,24 @@ def seed_demo(db: Session) -> None:
         )
 
     names = [
-        "Amelia Grant", "Noah Kim", "Priya Shah", "Lucas Reed", "Ibrahim Khan", "Sofia Flores",
-        "Ethan Ross", "Ava Price", "Theo Mason", "Mina Park",
+        "Amelia Grant",
+        "Noah Kim",
+        "Priya Shah",
+        "Lucas Reed",
+        "Ibrahim Khan",
+        "Sofia Flores",
+        "Ethan Ross",
+        "Ava Price",
+        "Theo Mason",
+        "Mina Park",
     ]
     services = [
-        "Buyer consultation", "Primary care intake", "Emergency plumbing", "Heating maintenance",
-        "Auto claim intake", "Roof inspection",
+        "Buyer consultation",
+        "Primary care intake",
+        "Emergency plumbing",
+        "Heating maintenance",
+        "Auto claim intake",
+        "Roof inspection",
     ]
     outcomes = ["qualified", "booked", "transferred", "escalated", "needs_review", "abandoned"]
     statuses = {
@@ -341,8 +524,13 @@ def seed_demo(db: Session) -> None:
             lead_score=score,
             quality_score=quality,
             consent_state="granted" if idx % 7 else "not_captured",
-            escalation_level="emergency" if outcome == "escalated" else ("human_review" if outcome in ["transferred", "needs_review"] else "none"),
-            metadata_json={"synthetic": True, "campaign": "Website inbound" if idx % 2 else "Referral campaign"},
+            escalation_level="emergency"
+            if outcome == "escalated"
+            else ("human_review" if outcome in ["transferred", "needs_review"] else "none"),
+            metadata_json={
+                "synthetic": True,
+                "campaign": "Website inbound" if idx % 2 else "Referral campaign",
+            },
             created_at=created_at,
         )
         lead_id = f"lead-seed-{idx:03d}"
@@ -356,11 +544,15 @@ def seed_demo(db: Session) -> None:
             phone=f"+1 (555) 01{idx % 10}-{1000 + idx:04d}",
             email=f"lead{idx}@example.test",
             service_type=services[idx % len(services)],
-            urgency="emergency" if outcome == "escalated" else ("high" if idx % 4 == 0 else "normal"),
+            urgency="emergency"
+            if outcome == "escalated"
+            else ("high" if idx % 4 == 0 else "normal"),
             location=["Riverside", "Downtown", "Oakview", "Eastbridge"][idx % 4],
             status=statuses[outcome],
             score=score,
-            owner=["Acquisitions Team", "Clinic Intake", "Operations Queue", "Human Review"][idx % 4],
+            owner=["Acquisitions Team", "Clinic Intake", "Operations Queue", "Human Review"][
+                idx % 4
+            ],
             tags=["synthetic", outcome],
             source_campaign="Website inbound" if idx % 2 else "Referral campaign",
             crm_sync_status="synced" if idx % 3 else "retrying",
@@ -378,7 +570,10 @@ def seed_demo(db: Session) -> None:
             policy_risk="medium" if outcome in ["transferred", "needs_review"] else "low",
             latency_ms=RNG.randint(420, 1400),
             sentiment_trend="improving" if idx % 3 else "stable",
-            findings=["Synthetic evaluation record.", "Review required when policy risk is medium."],
+            findings=[
+                "Synthetic evaluation record.",
+                "Review required when policy risk is medium.",
+            ],
             created_at=created_at,
         )
         if outcome == "booked" or idx % 7 == 0:
@@ -450,10 +645,19 @@ def seed_demo(db: Session) -> None:
                 organization_id=org_id,
                 lead_id=lead_id,
                 call_id=call_id,
-                appointment_id=f"apt-seed-{idx:03d}" if (outcome == "booked" or idx % 7 == 0) else None,
-                task_type=["callback", "review_transcript", "verify_booking", "update_crm"][idx % 4],
+                appointment_id=f"apt-seed-{idx:03d}"
+                if (outcome == "booked" or idx % 7 == 0)
+                else None,
+                task_type=["callback", "review_transcript", "verify_booking", "update_crm"][
+                    idx % 4
+                ],
                 title=f"Synthetic follow-up for {name}",
-                assignee=["Sales Representative", "Quality Reviewer", "Scheduler", "Operations Manager"][idx % 4],
+                assignee=[
+                    "Sales Representative",
+                    "Quality Reviewer",
+                    "Scheduler",
+                    "Operations Manager",
+                ][idx % 4],
                 due_at=now + timedelta(hours=idx + 1),
                 priority="high" if idx % 6 == 0 else "normal",
                 status="open" if idx % 3 else "completed",
@@ -469,8 +673,14 @@ def seed_demo(db: Session) -> None:
             name="Voice operations quality rubric",
             version="v1",
             dimensions=[
-                "consent captured", "extraction completeness", "booking correctness", "handoff correctness",
-                "emergency routing", "restricted-topic compliance", "PII handling", "call close quality",
+                "consent captured",
+                "extraction completeness",
+                "booking correctness",
+                "handoff correctness",
+                "emergency routing",
+                "restricted-topic compliance",
+                "PII handling",
+                "call close quality",
             ],
             is_active=True,
         )
@@ -496,7 +706,12 @@ def seed_demo(db: Session) -> None:
             status="completed",
             pass_rate=97.5,
             critical_failures=0,
-            result_json={"passed": 39, "failed": 1, "synthetic": True, "note": "Rule-assisted demo evaluation."},
+            result_json={
+                "passed": 39,
+                "failed": 1,
+                "synthetic": True,
+                "note": "Rule-assisted demo evaluation.",
+            },
         )
         ensure(
             db,
@@ -541,7 +756,12 @@ def seed_demo(db: Session) -> None:
             date_range="Last 7 days",
             generated_by="voxrelay.demo",
             data_freshness="Synthetic demo data, generated during seeding",
-            content_json={"quality_score": 89.7, "policy_flags": 3, "booking_integrity": "confirmed", "synthetic": True},
+            content_json={
+                "quality_score": 89.7,
+                "policy_flags": 3,
+                "booking_integrity": "confirmed",
+                "synthetic": True,
+            },
             export_id=f"export-{org_id}-weekly-quality",
         )
         ensure(
@@ -645,9 +865,23 @@ def seed_demo(db: Session) -> None:
             Alert,
             f"alert-seed-{idx:03d}",
             organization_id=org_id,
-            category=["queue_threshold", "booking_failure", "crm_sync_failure", "policy_violation", "emergency_detected", "quality_drop"][idx % 6],
+            category=[
+                "queue_threshold",
+                "booking_failure",
+                "crm_sync_failure",
+                "policy_violation",
+                "emergency_detected",
+                "quality_drop",
+            ][idx % 6],
             severity=severity,
-            title=["Queue SLA threshold exceeded", "Booking failed safely", "CRM mock delivery needs retry", "Policy review required", "Emergency escalation detected", "Quality score needs review"][idx % 6],
+            title=[
+                "Queue SLA threshold exceeded",
+                "Booking failed safely",
+                "CRM mock delivery needs retry",
+                "Policy review required",
+                "Emergency escalation detected",
+                "Quality score needs review",
+            ][idx % 6],
             detail="Synthetic demo alert. Evidence and remediation are available in the related workspace.",
             status="open" if idx % 3 else "acknowledged",
             entity_type="call",
@@ -680,10 +914,25 @@ def seed_demo(db: Session) -> None:
             organization_id=org_id,
             actor="voxrelay.system" if idx % 2 else "demo.operator",
             action=[
-                "agent.release_approved", "call.reviewed", "routing.rule_evaluated", "lead.exported",
-                "report.generated", "provider.health_checked", "workspace.switched", "crm.retry_requested",
+                "agent.release_approved",
+                "call.reviewed",
+                "routing.rule_evaluated",
+                "lead.exported",
+                "report.generated",
+                "provider.health_checked",
+                "workspace.switched",
+                "crm.retry_requested",
             ][idx % 8],
-            entity_type=["agent_version", "call", "routing_rule", "lead_export", "report", "provider", "workspace", "integration_job"][idx % 8],
+            entity_type=[
+                "agent_version",
+                "call",
+                "routing_rule",
+                "lead_export",
+                "report",
+                "provider",
+                "workspace",
+                "integration_job",
+            ][idx % 8],
             entity_id=f"entity-{idx:03d}",
             detail={"synthetic": True, "sequence": idx, "request_id": f"seed-{idx:03d}"},
             created_at=now - timedelta(hours=idx),

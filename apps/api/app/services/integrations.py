@@ -16,7 +16,9 @@ def enqueue_mock_crm_sync(
     idempotency_key: str,
     simulate_failure: bool = False,
 ) -> IntegrationJob:
-    existing = db.query(IntegrationJob).filter(IntegrationJob.idempotency_key == idempotency_key).first()
+    existing = (
+        db.query(IntegrationJob).filter(IntegrationJob.idempotency_key == idempotency_key).first()
+    )
     if existing:
         return existing
     status = "failed" if simulate_failure else "succeeded"
@@ -34,7 +36,12 @@ def enqueue_mock_crm_sync(
         max_attempts=3,
         next_retry_at=datetime.utcnow() + timedelta(minutes=5) if simulate_failure else None,
         last_error="Synthetic local CRM failure requested" if simulate_failure else "",
-        payload={"lead_id": lead.id, "name": redact_pii(lead.name), "phone": redact_pii(lead.phone), "synthetic": True},
+        payload={
+            "lead_id": lead.id,
+            "name": redact_pii(lead.name),
+            "phone": redact_pii(lead.phone),
+            "synthetic": True,
+        },
     )
     db.add(job)
     db.add(
@@ -84,7 +91,11 @@ def retry_mock_job(db: Session, job: IntegrationJob) -> IntegrationJob:
             action="crm.retry_succeeded",
             entity_type="integration_job",
             entity_id=job.id,
-            detail={"attempt": job.attempts, "idempotency_key": job.idempotency_key, "synthetic": True},
+            detail={
+                "attempt": job.attempts,
+                "idempotency_key": job.idempotency_key,
+                "synthetic": True,
+            },
         )
     )
     db.commit()

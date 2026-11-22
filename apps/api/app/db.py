@@ -237,7 +237,9 @@ class ExtractedEntity(Base, TimestampMixin):
     field_name: Mapped[str] = mapped_column(String(100), nullable=False)
     value: Mapped[str] = mapped_column(Text, default="")
     confidence: Mapped[float] = mapped_column(Float, default=0)
-    source_segment_id: Mapped[str | None] = mapped_column(ForeignKey("transcript_segments.id"), nullable=True)
+    source_segment_id: Mapped[str | None] = mapped_column(
+        ForeignKey("transcript_segments.id"), nullable=True
+    )
     validation_state: Mapped[str] = mapped_column(String(40), default="rule_assisted")
     reviewer_override: Mapped[str | None] = mapped_column(Text, nullable=True)
     pii_classification: Mapped[str] = mapped_column(String(60), default="none")
@@ -354,7 +356,9 @@ class CoachingTask(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
-    agent_version_id: Mapped[str | None] = mapped_column(ForeignKey("agent_versions.id"), nullable=True)
+    agent_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_versions.id"), nullable=True
+    )
     call_id: Mapped[str | None] = mapped_column(ForeignKey("call_sessions.id"), nullable=True)
     owner: Mapped[str] = mapped_column(String(150), default="Quality Team")
     title: Mapped[str] = mapped_column(String(220), nullable=False)

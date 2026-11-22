@@ -16,10 +16,15 @@ def login(client: TestClient, email: str = "admin@voxrelay.demo") -> dict[str, s
     )
     assert response.status_code == 200, response.text
     payload = response.json()
-    return {"Authorization": f"Bearer {payload['access_token']}", "X-Refresh-Token": payload["refresh_token"]}
+    return {
+        "Authorization": f"Bearer {payload['access_token']}",
+        "X-Refresh-Token": payload["refresh_token"],
+    }
 
 
-def workspace_token(client: TestClient, headers: dict[str, str], organization_id: str) -> dict[str, str]:
+def workspace_token(
+    client: TestClient, headers: dict[str, str], organization_id: str
+) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/switch-workspace",
         headers={"Authorization": headers["Authorization"]},
@@ -46,7 +51,9 @@ def test_health_login_and_workspace_membership(client: TestClient) -> None:
     switched = workspace_token(client, headers, "org-carebridge")
     carebridge_calls = client.get("/api/v1/calls", headers=switched)
     assert carebridge_calls.status_code == 200
-    assert all(call["organization_id"] == "org-carebridge" for call in carebridge_calls.json()["items"])
+    assert all(
+        call["organization_id"] == "org-carebridge" for call in carebridge_calls.json()["items"]
+    )
 
 
 def test_cross_tenant_call_lead_agent_and_report_access_is_blocked(client: TestClient) -> None:
@@ -55,11 +62,23 @@ def test_cross_tenant_call_lead_agent_and_report_access_is_blocked(client: TestC
     northstar_call = northstar_calls[0]
     northstar_lead = client.get("/api/v1/leads", headers=admin_headers).json()["items"][0]
     carebridge_headers = workspace_token(client, admin_headers, "org-carebridge")
-    assert client.get(f"/api/v1/calls/{northstar_call['id']}", headers=carebridge_headers).status_code == 404
-    assert client.get(f"/api/v1/leads/{northstar_lead['id']}", headers=carebridge_headers).status_code == 404
-    assert client.get("/api/v1/voice-agents/agent-realestate", headers=carebridge_headers).status_code == 404
+    assert (
+        client.get(f"/api/v1/calls/{northstar_call['id']}", headers=carebridge_headers).status_code
+        == 404
+    )
+    assert (
+        client.get(f"/api/v1/leads/{northstar_lead['id']}", headers=carebridge_headers).status_code
+        == 404
+    )
+    assert (
+        client.get("/api/v1/voice-agents/agent-realestate", headers=carebridge_headers).status_code
+        == 404
+    )
     report = client.get("/api/v1/reports", headers=admin_headers).json()["items"][0]
-    assert client.get(f"/api/v1/reports/{report['id']}/export", headers=carebridge_headers).status_code == 404
+    assert (
+        client.get(f"/api/v1/reports/{report['id']}/export", headers=carebridge_headers).status_code
+        == 404
+    )
 
 
 def test_deterministic_call_websocket_persists_transcript_and_entities(client: TestClient) -> None:
@@ -119,15 +138,25 @@ def test_agent_version_release_gate_lifecycle(client: TestClient) -> None:
     )
     assert create.status_code == 201, create.text
     version_id = create.json()["id"]
-    evaluated = client.post(f"/api/v1/voice-agents/versions/{version_id}/evaluate", headers=manager_headers)
+    evaluated = client.post(
+        f"/api/v1/voice-agents/versions/{version_id}/evaluate", headers=manager_headers
+    )
     assert evaluated.status_code == 200
-    submitted = client.post(f"/api/v1/voice-agents/versions/{version_id}/submit", headers=manager_headers)
+    submitted = client.post(
+        f"/api/v1/voice-agents/versions/{version_id}/submit", headers=manager_headers
+    )
     assert submitted.status_code == 200
     admin_headers = login(client)
     carebridge_headers = workspace_token(client, admin_headers, "org-carebridge")
-    approved = client.post(f"/api/v1/voice-agents/versions/{version_id}/approve", headers=carebridge_headers, json={"note": "Demo approval"})
+    approved = client.post(
+        f"/api/v1/voice-agents/versions/{version_id}/approve",
+        headers=carebridge_headers,
+        json={"note": "Demo approval"},
+    )
     assert approved.status_code == 200
-    activated = client.post(f"/api/v1/voice-agents/versions/{version_id}/activate", headers=carebridge_headers)
+    activated = client.post(
+        f"/api/v1/voice-agents/versions/{version_id}/activate", headers=carebridge_headers
+    )
     assert activated.status_code == 200
     assert activated.json()["version"]["status"] == "active"
 
@@ -149,7 +178,9 @@ def test_crm_idempotency_retry_and_calendar_conflict(client: TestClient) -> None
     )
     assert repeat.status_code == 200
     assert repeat.json()["job"]["id"] == failed.json()["job"]["id"]
-    retried = client.post(f"/api/v1/integrations/jobs/{failed.json()['job']['id']}/retry", headers=headers)
+    retried = client.post(
+        f"/api/v1/integrations/jobs/{failed.json()['job']['id']}/retry", headers=headers
+    )
     assert retried.status_code == 200
     assert retried.json()["job"]["status"] == "succeeded"
 
@@ -161,27 +192,45 @@ def test_crm_idempotency_retry_and_calendar_conflict(client: TestClient) -> None
     conflict = client.post(
         "/api/v1/appointments",
         headers=scheduler_headers,
-        json={"title": "Conflict test", "start_time": start.isoformat(), "end_time": end.isoformat(), "assignee": target["assignee"]},
+        json={
+            "title": "Conflict test",
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+            "assignee": target["assignee"],
+        },
     )
     assert conflict.status_code == 409
     safe_start = datetime.utcnow().replace(microsecond=0) + timedelta(days=180)
     available = client.post(
         "/api/v1/appointments",
         headers=scheduler_headers,
-        json={"title": "Conflict-safe test", "start_time": safe_start.isoformat(), "end_time": (safe_start + timedelta(hours=1)).isoformat(), "assignee": f"Verification Team {uuid4().hex[:8]}"},
+        json={
+            "title": "Conflict-safe test",
+            "start_time": safe_start.isoformat(),
+            "end_time": (safe_start + timedelta(hours=1)).isoformat(),
+            "assignee": f"Verification Team {uuid4().hex[:8]}",
+        },
     )
     assert available.status_code == 201
 
 
 def test_reports_api_keys_and_provider_visibility(client: TestClient) -> None:
     admin_headers = login(client)
-    generated = client.post("/api/v1/reports/generate", headers=admin_headers, json={"report_type": "Daily Voice Operations Brief"})
+    generated = client.post(
+        "/api/v1/reports/generate",
+        headers=admin_headers,
+        json={"report_type": "Daily Voice Operations Brief"},
+    )
     assert generated.status_code == 201
     report_id = generated.json()["id"]
     pdf = client.get(f"/api/v1/reports/{report_id}/export", headers=admin_headers)
     assert pdf.status_code == 200
     assert pdf.headers["content-type"].startswith("application/pdf")
-    key = client.post("/api/v1/security/api-keys", headers=admin_headers, json={"name": "Readonly calls", "scopes": ["calls:read"]})
+    key = client.post(
+        "/api/v1/security/api-keys",
+        headers=admin_headers,
+        json={"name": "Readonly calls", "scopes": ["calls:read"]},
+    )
     assert key.status_code == 201
     api_key = key.json()["api_key"]
     calls = client.get("/api/v1/calls", headers={"X-API-Key": api_key})

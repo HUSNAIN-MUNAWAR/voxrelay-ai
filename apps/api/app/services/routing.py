@@ -28,7 +28,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
                 return False
         elif isinstance(expected, (int, float)) and key.endswith("_below"):
             source_key = key.removesuffix("_below")
-            if not isinstance(context.get(source_key), (int, float)) or context[source_key] >= expected:
+            if (
+                not isinstance(context.get(source_key), (int, float))
+                or context[source_key] >= expected
+            ):
                 return False
         elif actual != expected:
             return False

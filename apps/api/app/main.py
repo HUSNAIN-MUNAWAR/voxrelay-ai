@@ -97,7 +97,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         bucket = self.requests[client]
         while bucket and bucket[0] < now - 60:
             bucket.popleft()
-        if len(bucket) >= settings.rate_limit_per_minute and request.url.path.startswith(settings.api_prefix):
+        if len(bucket) >= settings.rate_limit_per_minute and request.url.path.startswith(
+            settings.api_prefix
+        ):
             return Response(
                 content='{"detail":"Rate limit exceeded"}',
                 status_code=429,
@@ -312,9 +314,18 @@ class CoachingInput(BaseModel):
 
 @app.on_event("startup")
 def bootstrap() -> None:
-    insecure_secrets = {"change-me-in-production", "development-only-change-me", "production-change-me"}
-    if settings.environment not in {"development", "test"} and settings.jwt_secret in insecure_secrets:
-        raise RuntimeError("JWT_SECRET must be replaced before starting a non-development VoxRelay environment")
+    insecure_secrets = {
+        "change-me-in-production",
+        "development-only-change-me",
+        "production-change-me",
+    }
+    if (
+        settings.environment not in {"development", "test"}
+        and settings.jwt_secret in insecure_secrets
+    ):
+        raise RuntimeError(
+            "JWT_SECRET must be replaced before starting a non-development VoxRelay environment"
+        )
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -462,16 +473,25 @@ def _workspace_memberships(db: Session, user_id: str) -> list[dict[str, Any]]:
     records = (
         db.query(OrganizationMembership, Organization)
         .join(Organization, Organization.id == OrganizationMembership.organization_id)
-        .filter(OrganizationMembership.user_id == user_id, OrganizationMembership.is_active.is_(True))
+        .filter(
+            OrganizationMembership.user_id == user_id, OrganizationMembership.is_active.is_(True)
+        )
         .all()
     )
     return [
-        {"id": organization.id, "name": organization.name, "slug": organization.slug, "role": membership.role}
+        {
+            "id": organization.id,
+            "name": organization.name,
+            "slug": organization.slug,
+            "role": membership.role,
+        }
         for membership, organization in records
     ]
 
 
-def _issue_login_payload(db: Session, user: User, organization_id: str, role: str) -> dict[str, Any]:
+def _issue_login_payload(
+    db: Session, user: User, organization_id: str, role: str
+) -> dict[str, Any]:
     return {
         "access_token": create_access_token(user, organization_id, role),
         "refresh_token": create_refresh_session(db, user, organization_id),
@@ -523,7 +543,10 @@ def refresh(payload: RefreshInput, db: Db) -> dict[str, Any]:
     user, access_token, refresh_token = rotate_refresh_session(db, payload.refresh_token)
     membership = (
         db.query(OrganizationMembership)
-        .filter(OrganizationMembership.user_id == user.id, OrganizationMembership.organization_id == user.organization_id)
+        .filter(
+            OrganizationMembership.user_id == user.id,
+            OrganizationMembership.organization_id == user.organization_id,
+        )
         .first()
     )
     return {
@@ -531,7 +554,10 @@ def refresh(payload: RefreshInput, db: Db) -> dict[str, Any]:
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": {"id": user.id, "email": user.email, "name": user.name},
-        "workspace": {"organization_id": user.organization_id, "role": membership.role if membership else user.role},
+        "workspace": {
+            "organization_id": user.organization_id,
+            "role": membership.role if membership else user.role,
+        },
     }
 
 
@@ -605,7 +631,11 @@ def list_agents(db: Db, current: Current) -> list[dict[str, Any]]:
 
 
 @app.post(f"{settings.api_prefix}/voice-agents", status_code=201)
-def create_agent(payload: CreateAgentInput, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:manage"))]) -> dict[str, Any]:
+def create_agent(
+    payload: CreateAgentInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:manage"))],
+) -> dict[str, Any]:
     agent = VoiceAgent(
         id=f"agent-{uuid4().hex[:12]}",
         organization_id=current.organization_id,
@@ -625,11 +655,18 @@ def create_agent(payload: CreateAgentInput, db: Db, current: Annotated[Principal
 
 @app.get(f"{settings.api_prefix}/voice-agents/{{agent_id}}")
 def get_agent(agent_id: str, db: Db, current: Current) -> dict[str, Any]:
-    return agent_dict(require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent"))
+    return agent_dict(
+        require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
+    )
 
 
 @app.patch(f"{settings.api_prefix}/voice-agents/{{agent_id}}")
-def update_agent(agent_id: str, payload: UpdateAgentInput, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:manage"))]) -> dict[str, Any]:
+def update_agent(
+    agent_id: str,
+    payload: UpdateAgentInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:manage"))],
+) -> dict[str, Any]:
     agent = require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
     if payload.name:
         agent.name = payload.name
@@ -643,11 +680,19 @@ def update_agent(agent_id: str, payload: UpdateAgentInput, db: Db, current: Anno
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/{{agent_id}}/versions", status_code=201)
-def create_agent_version(agent_id: str, payload: AgentVersionInput, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:manage"))]) -> dict[str, Any]:
+def create_agent_version(
+    agent_id: str,
+    payload: AgentVersionInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:manage"))],
+) -> dict[str, Any]:
     agent = require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
     last = (
         db.query(func.max(AgentVersion.version_number))
-        .filter(AgentVersion.agent_id == agent.id, AgentVersion.organization_id == current.organization_id)
+        .filter(
+            AgentVersion.agent_id == agent.id,
+            AgentVersion.organization_id == current.organization_id,
+        )
         .scalar()
         or agent.version
     )
@@ -672,7 +717,14 @@ def create_agent_version(agent_id: str, payload: AgentVersionInput, db: Db, curr
         },
     )
     db.add(version)
-    audit(db, current.organization_id, current.email, "agent.version_created", "agent_version", version.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent.version_created",
+        "agent_version",
+        version.id,
+    )
     db.commit()
     return version_dict(version)
 
@@ -682,7 +734,10 @@ def list_agent_versions(agent_id: str, db: Db, current: Current) -> dict[str, An
     require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
     versions = (
         db.query(AgentVersion)
-        .filter(AgentVersion.agent_id == agent_id, AgentVersion.organization_id == current.organization_id)
+        .filter(
+            AgentVersion.agent_id == agent_id,
+            AgentVersion.organization_id == current.organization_id,
+        )
         .order_by(AgentVersion.version_number.desc())
         .all()
     )
@@ -690,12 +745,17 @@ def list_agent_versions(agent_id: str, db: Db, current: Current) -> dict[str, An
 
 
 @app.get(f"{settings.api_prefix}/voice-agents/{{agent_id}}/versions/compare")
-def compare_versions(agent_id: str, from_version: int, to_version: int, db: Db, current: Current) -> dict[str, Any]:
+def compare_versions(
+    agent_id: str, from_version: int, to_version: int, db: Db, current: Current
+) -> dict[str, Any]:
     require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
     versions = {
         version.version_number: version
         for version in db.query(AgentVersion)
-        .filter(AgentVersion.agent_id == agent_id, AgentVersion.organization_id == current.organization_id)
+        .filter(
+            AgentVersion.agent_id == agent_id,
+            AgentVersion.organization_id == current.organization_id,
+        )
         .all()
     }
     source, target = versions.get(from_version), versions.get(to_version)
@@ -703,7 +763,11 @@ def compare_versions(agent_id: str, from_version: int, to_version: int, db: Db, 
         raise HTTPException(status_code=404, detail="Requested versions are unavailable")
     keys = sorted(set(source.config_snapshot) | set(target.config_snapshot))
     changes = [
-        {"field": key, "from": source.config_snapshot.get(key), "to": target.config_snapshot.get(key)}
+        {
+            "field": key,
+            "from": source.config_snapshot.get(key),
+            "to": target.config_snapshot.get(key),
+        }
         for key in keys
         if source.config_snapshot.get(key) != target.config_snapshot.get(key)
     ]
@@ -712,8 +776,14 @@ def compare_versions(agent_id: str, from_version: int, to_version: int, db: Db, 
         "to": version_dict(target),
         "configuration_changes": changes,
         "metric_comparison": {
-            "evaluation_pass_rate": [source.evaluation_summary.get("pass_rate", 0), target.evaluation_summary.get("pass_rate", 0)],
-            "critical_failures": [source.evaluation_summary.get("critical_failures", 0), target.evaluation_summary.get("critical_failures", 0)],
+            "evaluation_pass_rate": [
+                source.evaluation_summary.get("pass_rate", 0),
+                target.evaluation_summary.get("pass_rate", 0),
+            ],
+            "critical_failures": [
+                source.evaluation_summary.get("critical_failures", 0),
+                target.evaluation_summary.get("critical_failures", 0),
+            ],
             "latency_difference_ms": 18,
             "human_handoff_rate_difference": -1.8,
             "synthetic": True,
@@ -722,9 +792,19 @@ def compare_versions(agent_id: str, from_version: int, to_version: int, db: Db, 
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/versions/{{version_id}}/evaluate")
-def evaluate_agent_version(version_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:manage"))]) -> dict[str, Any]:
-    version = require_org_record(db.get(AgentVersion, version_id), current.organization_id, "Agent version")
-    suite = db.query(EvaluationSuite).filter(EvaluationSuite.organization_id == current.organization_id).first()
+def evaluate_agent_version(
+    version_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:manage"))],
+) -> dict[str, Any]:
+    version = require_org_record(
+        db.get(AgentVersion, version_id), current.organization_id, "Agent version"
+    )
+    suite = (
+        db.query(EvaluationSuite)
+        .filter(EvaluationSuite.organization_id == current.organization_id)
+        .first()
+    )
     if not suite:
         raise HTTPException(status_code=404, detail="Evaluation suite not found")
     cases = suite.cases
@@ -738,13 +818,20 @@ def evaluate_agent_version(version_id: str, db: Db, current: Annotated[Principal
         "required_scenarios_passed": critical_failures == 0,
         "emergency_behavior_valid": critical_failures == 0,
         "consent_flow_valid": bool(version.config_snapshot.get("consent_required", True)),
-        "restricted_topic_policy_valid": bool(version.config_snapshot.get("restricted_topics", CONFIGURED_RESTRICTED_TOPICS)),
+        "restricted_topic_policy_valid": bool(
+            version.config_snapshot.get("restricted_topics", CONFIGURED_RESTRICTED_TOPICS)
+        ),
         "required_extraction_valid": bool(version.config_snapshot.get("required_fields", [])),
         "critical_failures": critical_failures,
         "approval_granted": False,
     }
     version.status = "testing"
-    version.evaluation_summary = {"pass_rate": pass_rate, "critical_failures": critical_failures, "cases": len(cases), "synthetic": True}
+    version.evaluation_summary = {
+        "pass_rate": pass_rate,
+        "critical_failures": critical_failures,
+        "cases": len(cases),
+        "synthetic": True,
+    }
     version.release_gates = gates
     run = EvaluationRun(
         id=f"eval-run-{uuid4().hex[:12]}",
@@ -754,10 +841,22 @@ def evaluate_agent_version(version_id: str, db: Db, current: Annotated[Principal
         status="completed",
         pass_rate=pass_rate,
         critical_failures=critical_failures,
-        result_json={"passed": int(len(cases) * pass_rate / 100), "failed": len(cases) - int(len(cases) * pass_rate / 100), "synthetic": True},
+        result_json={
+            "passed": int(len(cases) * pass_rate / 100),
+            "failed": len(cases) - int(len(cases) * pass_rate / 100),
+            "synthetic": True,
+        },
     )
     db.add(run)
-    audit(db, current.organization_id, current.email, "agent.evaluation_completed", "agent_version", version.id, {"run_id": run.id, "pass_rate": pass_rate})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent.evaluation_completed",
+        "agent_version",
+        version.id,
+        {"run_id": run.id, "pass_rate": pass_rate},
+    )
     db.commit()
     return {"version": version_dict(version), "run_id": run.id, "suite": suite.name}
 
@@ -766,23 +865,51 @@ CONFIGURED_RESTRICTED_TOPICS = ["medical diagnosis", "coverage determination", "
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/versions/{{version_id}}/submit")
-def submit_agent_version(version_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:manage"))]) -> dict[str, Any]:
-    version = require_org_record(db.get(AgentVersion, version_id), current.organization_id, "Agent version")
+def submit_agent_version(
+    version_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:manage"))],
+) -> dict[str, Any]:
+    version = require_org_record(
+        db.get(AgentVersion, version_id), current.organization_id, "Agent version"
+    )
     gates = version.release_gates or {}
     blockers = [key for key, value in gates.items() if key != "approval_granted" and value is False]
     if blockers or int(gates.get("critical_failures", 0)) > 0:
-        raise HTTPException(status_code=422, detail={"message": "Release gate blocked", "blockers": blockers or ["critical_failures"]})
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Release gate blocked",
+                "blockers": blockers or ["critical_failures"],
+            },
+        )
     version.status = "in_review"
-    audit(db, current.organization_id, current.email, "agent.version_submitted", "agent_version", version.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent.version_submitted",
+        "agent_version",
+        version.id,
+    )
     db.commit()
     return version_dict(version)
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/versions/{{version_id}}/approve")
-def approve_agent_version(version_id: str, payload: ApprovalInput, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:approve"))]) -> dict[str, Any]:
-    version = require_org_record(db.get(AgentVersion, version_id), current.organization_id, "Agent version")
+def approve_agent_version(
+    version_id: str,
+    payload: ApprovalInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:approve"))],
+) -> dict[str, Any]:
+    version = require_org_record(
+        db.get(AgentVersion, version_id), current.organization_id, "Agent version"
+    )
     if version.status not in {"in_review", "testing", "approved"}:
-        raise HTTPException(status_code=422, detail="Version must be in review after evaluation before approval")
+        raise HTTPException(
+            status_code=422, detail="Version must be in review after evaluation before approval"
+        )
     if int(version.release_gates.get("critical_failures", 0)) > 0:
         raise HTTPException(status_code=422, detail="Critical evaluation failures block approval")
     version.status = "approved"
@@ -797,30 +924,62 @@ def approve_agent_version(version_id: str, payload: ApprovalInput, db: Db, curre
             note=payload.note,
         )
     )
-    audit(db, current.organization_id, current.email, "agent.release_approved", "agent_version", version.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent.release_approved",
+        "agent_version",
+        version.id,
+    )
     db.commit()
     return version_dict(version)
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/versions/{{version_id}}/stage")
-def stage_agent_version(version_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:approve"))]) -> dict[str, Any]:
-    version = require_org_record(db.get(AgentVersion, version_id), current.organization_id, "Agent version")
+def stage_agent_version(
+    version_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:approve"))],
+) -> dict[str, Any]:
+    version = require_org_record(
+        db.get(AgentVersion, version_id), current.organization_id, "Agent version"
+    )
     if version.status != "approved":
         raise HTTPException(status_code=409, detail="Only approved versions can be staged")
     version.status = "staged"
-    audit(db, current.organization_id, current.email, "agent_version.staged", "agent_version", version.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent_version.staged",
+        "agent_version",
+        version.id,
+    )
     db.commit()
     return {"version": version_dict(version), "status": "staged"}
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/versions/{{version_id}}/activate")
-def activate_agent_version(version_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:activate"))]) -> dict[str, Any]:
-    version = require_org_record(db.get(AgentVersion, version_id), current.organization_id, "Agent version")
+def activate_agent_version(
+    version_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:activate"))],
+) -> dict[str, Any]:
+    version = require_org_record(
+        db.get(AgentVersion, version_id), current.organization_id, "Agent version"
+    )
     gates = version.release_gates or {}
-    allowed = version.status in {"approved", "staged"} and gates.get("approval_granted") and int(gates.get("critical_failures", 0)) == 0
+    allowed = (
+        version.status in {"approved", "staged"}
+        and gates.get("approval_granted")
+        and int(gates.get("critical_failures", 0)) == 0
+    )
     if not allowed:
         raise HTTPException(status_code=422, detail="Release gate prevents activation")
-    agent = require_org_record(db.get(VoiceAgent, version.agent_id), current.organization_id, "Agent")
+    agent = require_org_record(
+        db.get(VoiceAgent, version.agent_id), current.organization_id, "Agent"
+    )
     db.query(AgentVersion).filter(
         AgentVersion.agent_id == agent.id,
         AgentVersion.organization_id == current.organization_id,
@@ -831,23 +990,42 @@ def activate_agent_version(version_id: str, db: Db, current: Annotated[Principal
     agent.version = version.version_number
     agent.status = "active"
     agent.config = version.config_snapshot
-    audit(db, current.organization_id, current.email, "agent.version_activated", "agent_version", version.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent.version_activated",
+        "agent_version",
+        version.id,
+    )
     db.commit()
     return {"version": version_dict(version), "agent": agent_dict(agent)}
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/{{agent_id}}/rollback")
-def rollback_agent(agent_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("agents:activate"))]) -> dict[str, Any]:
+def rollback_agent(
+    agent_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("agents:activate"))],
+) -> dict[str, Any]:
     agent = require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
     previous = (
         db.query(AgentVersion)
-        .filter(AgentVersion.agent_id == agent_id, AgentVersion.organization_id == current.organization_id, AgentVersion.status.in_(["deprecated", "approved"]))
+        .filter(
+            AgentVersion.agent_id == agent_id,
+            AgentVersion.organization_id == current.organization_id,
+            AgentVersion.status.in_(["deprecated", "approved"]),
+        )
         .order_by(AgentVersion.version_number.desc())
         .first()
     )
     active = (
         db.query(AgentVersion)
-        .filter(AgentVersion.agent_id == agent_id, AgentVersion.organization_id == current.organization_id, AgentVersion.status == "active")
+        .filter(
+            AgentVersion.agent_id == agent_id,
+            AgentVersion.organization_id == current.organization_id,
+            AgentVersion.status == "active",
+        )
         .first()
     )
     if not previous or not active:
@@ -858,17 +1036,34 @@ def rollback_agent(agent_id: str, db: Db, current: Annotated[Principal, Depends(
     previous.activated_at = datetime.utcnow()
     agent.version = previous.version_number
     agent.config = previous.config_snapshot
-    audit(db, current.organization_id, current.email, "agent.version_rolled_back", "voice_agent", agent.id, {"target": previous.id})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "agent.version_rolled_back",
+        "voice_agent",
+        agent.id,
+        {"target": previous.id},
+    )
     db.commit()
     return {"agent": agent_dict(agent), "activated_version": version_dict(previous)}
 
 
 @app.post(f"{settings.api_prefix}/voice-agents/{{agent_id}}/simulate", status_code=201)
-def simulate_agent(agent_id: str, payload: SimulateInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:read"))]) -> dict[str, Any]:
+def simulate_agent(
+    agent_id: str,
+    payload: SimulateInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:read"))],
+) -> dict[str, Any]:
     agent = require_org_record(db.get(VoiceAgent, agent_id), current.organization_id, "Agent")
     if payload.scenario not in SCENARIOS:
-        raise HTTPException(status_code=422, detail={"message": "Unknown scenario", "available": list(SCENARIOS)})
-    call = create_simulated_call(db, payload.scenario, agent.id, current.organization_id, current.email)
+        raise HTTPException(
+            status_code=422, detail={"message": "Unknown scenario", "available": list(SCENARIOS)}
+        )
+    call = create_simulated_call(
+        db, payload.scenario, agent.id, current.organization_id, current.email
+    )
     return {
         "call": call_dict(call),
         "websocket_path": f"{settings.api_prefix}/ws/calls/{call.id}",
@@ -902,13 +1097,24 @@ def list_calls(
 
 
 @app.post(f"{settings.api_prefix}/calls/simulated", status_code=201)
-def create_call(payload: SimulateInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:read"))]) -> dict[str, Any]:
+def create_call(
+    payload: SimulateInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:read"))],
+) -> dict[str, Any]:
     scenario = SCENARIOS.get(payload.scenario)
     if not scenario:
-        raise HTTPException(status_code=422, detail={"message": "Unknown scenario", "available": list(SCENARIOS)})
+        raise HTTPException(
+            status_code=422, detail={"message": "Unknown scenario", "available": list(SCENARIOS)}
+        )
     agent = db.get(VoiceAgent, scenario.agent_id)
     if not agent or agent.organization_id != current.organization_id:
-        agent = db.query(VoiceAgent).filter(VoiceAgent.organization_id == current.organization_id).order_by(VoiceAgent.name).first()
+        agent = (
+            db.query(VoiceAgent)
+            .filter(VoiceAgent.organization_id == current.organization_id)
+            .order_by(VoiceAgent.name)
+            .first()
+        )
     if not agent:
         raise HTTPException(status_code=422, detail="No agent is configured in this workspace")
     return simulate_agent(agent.id, payload, db, current)
@@ -917,10 +1123,31 @@ def create_call(payload: SimulateInput, db: Db, current: Annotated[Principal, De
 @app.get(f"{settings.api_prefix}/calls/{{call_id}}")
 def call_detail(call_id: str, db: Db, current: Current) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
-    segments = db.query(TranscriptSegment).filter(TranscriptSegment.call_id == call_id).order_by(TranscriptSegment.offset_ms).all()
-    events = db.query(CallEvent).filter(CallEvent.call_id == call_id, CallEvent.organization_id == current.organization_id).order_by(CallEvent.occurred_at).all()
-    entities = db.query(ExtractedEntity).filter(ExtractedEntity.call_id == call_id, ExtractedEntity.organization_id == current.organization_id).all()
-    lead = db.query(Lead).filter(Lead.call_id == call_id, Lead.organization_id == current.organization_id).first()
+    segments = (
+        db.query(TranscriptSegment)
+        .filter(TranscriptSegment.call_id == call_id)
+        .order_by(TranscriptSegment.offset_ms)
+        .all()
+    )
+    events = (
+        db.query(CallEvent)
+        .filter(CallEvent.call_id == call_id, CallEvent.organization_id == current.organization_id)
+        .order_by(CallEvent.occurred_at)
+        .all()
+    )
+    entities = (
+        db.query(ExtractedEntity)
+        .filter(
+            ExtractedEntity.call_id == call_id,
+            ExtractedEntity.organization_id == current.organization_id,
+        )
+        .all()
+    )
+    lead = (
+        db.query(Lead)
+        .filter(Lead.call_id == call_id, Lead.organization_id == current.organization_id)
+        .first()
+    )
     appointment = (
         db.query(Appointment)
         .join(Lead, Appointment.lead_id == Lead.id)
@@ -928,7 +1155,14 @@ def call_detail(call_id: str, db: Db, current: Current) -> dict[str, Any]:
         .first()
     )
     quality = db.query(QualityEvaluation).filter(QualityEvaluation.call_id == call_id).first()
-    feedback = db.query(ReviewerFeedback).filter(ReviewerFeedback.call_id == call_id, ReviewerFeedback.organization_id == current.organization_id).all()
+    feedback = (
+        db.query(ReviewerFeedback)
+        .filter(
+            ReviewerFeedback.call_id == call_id,
+            ReviewerFeedback.organization_id == current.organization_id,
+        )
+        .all()
+    )
     return {
         "call": call_dict(call),
         "transcript": [
@@ -948,7 +1182,9 @@ def call_detail(call_id: str, db: Db, current: Current) -> dict[str, Any]:
                 "type": event.event_type,
                 "event_type": event.payload.get("event_type", event.event_type),
                 "sequence": event.payload.get("sequence"),
-                "trace_id": event.payload.get("trace_id", call.metadata_json.get("trace_id", f"trace-{call.id}")),
+                "trace_id": event.payload.get(
+                    "trace_id", call.metadata_json.get("trace_id", f"trace-{call.id}")
+                ),
                 "schema_version": event.payload.get("schema_version", "legacy"),
                 "state": event.state,
                 "payload": event.payload,
@@ -987,23 +1223,47 @@ def call_detail(call_id: str, db: Db, current: Current) -> dict[str, Any]:
             else None
         ),
         "reviewer_feedback": [
-            {"id": item.id, "score": item.score, "feedback": item.feedback, "policy_violation": item.policy_violation, "training_example": item.training_example}
+            {
+                "id": item.id,
+                "score": item.score,
+                "feedback": item.feedback,
+                "policy_violation": item.policy_violation,
+                "training_example": item.training_example,
+            }
             for item in feedback
         ],
     }
 
 
 @app.patch(f"{settings.api_prefix}/calls/{{call_id}}/outcome")
-def update_outcome(call_id: str, payload: OutcomeInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:transfer"))]) -> dict[str, str]:
+def update_outcome(
+    call_id: str,
+    payload: OutcomeInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:transfer"))],
+) -> dict[str, str]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
     call.outcome = payload.outcome
-    audit(db, current.organization_id, current.email, "call.outcome_updated", "call", call.id, {"outcome": payload.outcome})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "call.outcome_updated",
+        "call",
+        call.id,
+        {"outcome": payload.outcome},
+    )
     db.commit()
     return {"id": call.id, "outcome": call.outcome}
 
 
 @app.post(f"{settings.api_prefix}/calls/{{call_id}}/notes", status_code=201)
-def add_call_note(call_id: str, payload: NoteInput, db: Db, current: Annotated[Principal, Depends(require_permissions("quality:review"))]) -> dict[str, Any]:
+def add_call_note(
+    call_id: str,
+    payload: NoteInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("quality:review"))],
+) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
     redacted = redact_pii(payload.note)
     event = CallEvent(
@@ -1012,19 +1272,39 @@ def add_call_note(call_id: str, payload: NoteInput, db: Db, current: Annotated[P
         call_id=call.id,
         event_type="note.added",
         state=call.status,
-        payload={"note_redacted": redacted, "trace_id": call.metadata_json.get("trace_id", f"trace-{call.id}"), "schema_version": "2026-07.phase3"},
+        payload={
+            "note_redacted": redacted,
+            "trace_id": call.metadata_json.get("trace_id", f"trace-{call.id}"),
+            "schema_version": "2026-07.phase3",
+        },
     )
     db.add(event)
-    audit(db, current.organization_id, current.email, "call.note_added", "call", call.id, {"redacted": True})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "call.note_added",
+        "call",
+        call.id,
+        {"redacted": True},
+    )
     db.commit()
     return {"status": "noted", "event_id": event.id, "note_redacted": redacted}
 
 
 @app.post(f"{settings.api_prefix}/calls/{{call_id}}/cancel")
-def cancel_call(call_id: str, payload: CancelInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:transfer"))]) -> dict[str, Any]:
+def cancel_call(
+    call_id: str,
+    payload: CancelInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:transfer"))],
+) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
     if call.status in {"completed", "failed", "abandoned"}:
-        return {"status": call.status, "detail": "Call was already terminal; no duplicate cancellation was applied."}
+        return {
+            "status": call.status,
+            "detail": "Call was already terminal; no duplicate cancellation was applied.",
+        }
     call.status = "abandoned"
     call.outcome = "cancelled"
     event = CallEvent(
@@ -1033,18 +1313,37 @@ def cancel_call(call_id: str, payload: CancelInput, db: Db, current: Annotated[P
         call_id=call.id,
         event_type="simulation.cancelled",
         state="abandoned",
-        payload={"reason": payload.reason, "trace_id": call.metadata_json.get("trace_id", f"trace-{call.id}"), "schema_version": "2026-07.phase3"},
+        payload={
+            "reason": payload.reason,
+            "trace_id": call.metadata_json.get("trace_id", f"trace-{call.id}"),
+            "schema_version": "2026-07.phase3",
+        },
     )
     db.add(event)
-    audit(db, current.organization_id, current.email, "simulation.cancelled", "call", call.id, {"reason": payload.reason})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "simulation.cancelled",
+        "call",
+        call.id,
+        {"reason": payload.reason},
+    )
     db.commit()
     return {"status": "abandoned", "event_id": event.id}
 
 
 @app.post(f"{settings.api_prefix}/calls/{{call_id}}/transfer")
-def transfer_call(call_id: str, payload: TransferInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:transfer"))]) -> dict[str, Any]:
+def transfer_call(
+    call_id: str,
+    payload: TransferInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:transfer"))],
+) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
-    team = require_org_record(db.get(HandoffTeam, payload.team_id), current.organization_id, "Handoff team")
+    team = require_org_record(
+        db.get(HandoffTeam, payload.team_id), current.organization_id, "Handoff team"
+    )
     call.outcome = "transferred"
     call.escalation_level = "human"
     call.status = "handoff_pending"
@@ -1055,16 +1354,38 @@ def transfer_call(call_id: str, payload: TransferInput, db: Db, current: Annotat
             call_id=call.id,
             event_type="handoff",
             state="handoff_pending",
-            payload={"team": team.name, "destination": team.destination, "note": payload.note, "human_controlled": True},
+            payload={
+                "team": team.name,
+                "destination": team.destination,
+                "note": payload.note,
+                "human_controlled": True,
+            },
         )
     )
-    audit(db, current.organization_id, current.email, "call.transferred", "call", call.id, {"team": team.name, "note": payload.note})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "call.transferred",
+        "call",
+        call.id,
+        {"team": team.name, "note": payload.note},
+    )
     db.commit()
-    return {"call_id": call.id, "status": "handoff_pending", "team": {"id": team.id, "name": team.name, "destination": team.destination}, "summary": "Structured handoff summary is stored locally; no external transfer carrier was invoked."}
+    return {
+        "call_id": call.id,
+        "status": "handoff_pending",
+        "team": {"id": team.id, "name": team.name, "destination": team.destination},
+        "summary": "Structured handoff summary is stored locally; no external transfer carrier was invoked.",
+    }
 
 
 @app.post(f"{settings.api_prefix}/calls/{{call_id}}/takeover")
-def takeover_call(call_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:takeover"))]) -> dict[str, Any]:
+def takeover_call(
+    call_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:takeover"))],
+) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
     call.status = "human_takeover"
     call.escalation_level = "human_takeover"
@@ -1078,13 +1399,30 @@ def takeover_call(call_id: str, db: Db, current: Annotated[Principal, Depends(re
             payload={"supervisor": current.email, "simulated": True},
         )
     )
-    audit(db, current.organization_id, current.email, "call.human_takeover", "call", call.id, {"synthetic": True})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "call.human_takeover",
+        "call",
+        call.id,
+        {"synthetic": True},
+    )
     db.commit()
-    return {"call_id": call.id, "status": "human_takeover", "notice": "Supervisor takeover is simulated locally; carrier audio control is an optional telephony adapter capability."}
+    return {
+        "call_id": call.id,
+        "status": "human_takeover",
+        "notice": "Supervisor takeover is simulated locally; carrier audio control is an optional telephony adapter capability.",
+    }
 
 
 @app.post(f"{settings.api_prefix}/calls/{{call_id}}/review-feedback")
-def add_review_feedback(call_id: str, payload: ReviewInput, db: Db, current: Annotated[Principal, Depends(require_permissions("quality:review"))]) -> dict[str, Any]:
+def add_review_feedback(
+    call_id: str,
+    payload: ReviewInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("quality:review"))],
+) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
     review = ReviewerFeedback(
         id=f"review-{uuid4().hex[:12]}",
@@ -1105,16 +1443,32 @@ def add_review_feedback(call_id: str, payload: ReviewInput, db: Db, current: Ann
         "review.feedback_added",
         "call",
         call.id,
-        {"training_example": payload.mark_training_example, "policy_violation": payload.policy_violation},
+        {
+            "training_example": payload.mark_training_example,
+            "policy_violation": payload.policy_violation,
+        },
     )
     db.commit()
-    return {"status": "saved", "review_id": review.id, "training_example": payload.mark_training_example}
+    return {
+        "status": "saved",
+        "review_id": review.id,
+        "training_example": payload.mark_training_example,
+    }
 
 
 @app.post(f"{settings.api_prefix}/calls/{{call_id}}/follow-up", status_code=201)
-def create_follow_up(call_id: str, payload: FollowUpInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:transfer"))]) -> dict[str, Any]:
+def create_follow_up(
+    call_id: str,
+    payload: FollowUpInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:transfer"))],
+) -> dict[str, Any]:
     call = require_org_record(db.get(CallSession, call_id), current.organization_id, "Call")
-    lead = db.query(Lead).filter(Lead.call_id == call.id, Lead.organization_id == current.organization_id).first()
+    lead = (
+        db.query(Lead)
+        .filter(Lead.call_id == call.id, Lead.organization_id == current.organization_id)
+        .first()
+    )
     task = FollowUpTask(
         id=f"task-{uuid4().hex[:12]}",
         organization_id=current.organization_id,
@@ -1128,7 +1482,15 @@ def create_follow_up(call_id: str, payload: FollowUpInput, db: Db, current: Anno
         status="open",
     )
     db.add(task)
-    audit(db, current.organization_id, current.email, "follow_up.created", "call", call.id, {"task_id": task.id})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "follow_up.created",
+        "call",
+        call.id,
+        {"task_id": task.id},
+    )
     db.commit()
     return {"id": task.id, "status": task.status, "title": task.title}
 
@@ -1139,7 +1501,9 @@ async def websocket_call(websocket: WebSocket, call_id: str, token: str | None =
     db = SessionLocal()
     try:
         if not token:
-            await websocket.send_json({"type": "error", "detail": "token query parameter is required"})
+            await websocket.send_json(
+                {"type": "error", "detail": "token query parameter is required"}
+            )
             await websocket.close(code=4401)
             return
         from app.security import _principal_from_token
@@ -1163,7 +1527,13 @@ async def websocket_call(websocket: WebSocket, call_id: str, token: str | None =
 
 
 @app.get(f"{settings.api_prefix}/leads")
-def list_leads(db: Db, current: Current, status: str | None = None, q: str = "", limit: int = Query(100, ge=1, le=200)) -> dict[str, Any]:
+def list_leads(
+    db: Db,
+    current: Current,
+    status: str | None = None,
+    q: str = "",
+    limit: int = Query(100, ge=1, le=200),
+) -> dict[str, Any]:
     query = db.query(Lead).filter(Lead.organization_id == current.organization_id)
     if status:
         query = query.filter(Lead.status == status)
@@ -1175,7 +1545,11 @@ def list_leads(db: Db, current: Current, status: str | None = None, q: str = "",
 
 
 @app.post(f"{settings.api_prefix}/leads", status_code=201)
-def create_lead(payload: LeadInput, db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))]) -> dict[str, Any]:
+def create_lead(
+    payload: LeadInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("leads:manage"))],
+) -> dict[str, Any]:
     lead = Lead(
         id=f"lead-{uuid4().hex[:12]}",
         organization_id=current.organization_id,
@@ -1192,19 +1566,47 @@ def create_lead(payload: LeadInput, db: Db, current: Annotated[Principal, Depend
 @app.get(f"{settings.api_prefix}/leads/{{lead_id}}")
 def get_lead(lead_id: str, db: Db, current: Current) -> dict[str, Any]:
     lead = require_org_record(db.get(Lead, lead_id), current.organization_id, "Lead")
-    calls = db.query(CallSession).filter(CallSession.id == lead.call_id, CallSession.organization_id == current.organization_id).all() if lead.call_id else []
-    tasks = db.query(FollowUpTask).filter(FollowUpTask.lead_id == lead.id, FollowUpTask.organization_id == current.organization_id).all()
-    appointments = db.query(Appointment).filter(Appointment.lead_id == lead.id, Appointment.organization_id == current.organization_id).all()
+    calls = (
+        db.query(CallSession)
+        .filter(
+            CallSession.id == lead.call_id, CallSession.organization_id == current.organization_id
+        )
+        .all()
+        if lead.call_id
+        else []
+    )
+    tasks = (
+        db.query(FollowUpTask)
+        .filter(
+            FollowUpTask.lead_id == lead.id, FollowUpTask.organization_id == current.organization_id
+        )
+        .all()
+    )
+    appointments = (
+        db.query(Appointment)
+        .filter(
+            Appointment.lead_id == lead.id, Appointment.organization_id == current.organization_id
+        )
+        .all()
+    )
     return {
         "lead": lead_dict(lead),
         "linked_calls": [call_dict(call) for call in calls],
-        "follow_up_tasks": [{"id": task.id, "title": task.title, "status": task.status, "priority": task.priority} for task in tasks],
+        "follow_up_tasks": [
+            {"id": task.id, "title": task.title, "status": task.status, "priority": task.priority}
+            for task in tasks
+        ],
         "appointments": [appointment_dict(appointment) for appointment in appointments],
     }
 
 
 @app.patch(f"{settings.api_prefix}/leads/{{lead_id}}")
-def update_lead(lead_id: str, payload: LeadInput, db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))]) -> dict[str, Any]:
+def update_lead(
+    lead_id: str,
+    payload: LeadInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("leads:manage"))],
+) -> dict[str, Any]:
     lead = require_org_record(db.get(Lead, lead_id), current.organization_id, "Lead")
     for key, value in payload.model_dump().items():
         setattr(lead, key, value)
@@ -1214,35 +1616,76 @@ def update_lead(lead_id: str, payload: LeadInput, db: Db, current: Annotated[Pri
 
 
 @app.post(f"{settings.api_prefix}/leads/{{lead_id}}/stage")
-def update_lead_stage(lead_id: str, payload: LeadStageInput, db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))]) -> dict[str, Any]:
+def update_lead_stage(
+    lead_id: str,
+    payload: LeadStageInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("leads:manage"))],
+) -> dict[str, Any]:
     lead = require_org_record(db.get(Lead, lead_id), current.organization_id, "Lead")
     lead.status = payload.status
-    audit(db, current.organization_id, current.email, "lead.stage_updated", "lead", lead.id, {"status": payload.status})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "lead.stage_updated",
+        "lead",
+        lead.id,
+        {"status": payload.status},
+    )
     db.commit()
     return lead_dict(lead)
 
 
 @app.post(f"{settings.api_prefix}/leads/{{lead_id}}/merge")
-def merge_leads(lead_id: str, payload: MergeLeadInput, db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))]) -> dict[str, Any]:
+def merge_leads(
+    lead_id: str,
+    payload: MergeLeadInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("leads:manage"))],
+) -> dict[str, Any]:
     primary = require_org_record(db.get(Lead, lead_id), current.organization_id, "Lead")
-    duplicate = require_org_record(db.get(Lead, payload.duplicate_lead_id), current.organization_id, "Duplicate lead")
+    duplicate = require_org_record(
+        db.get(Lead, payload.duplicate_lead_id), current.organization_id, "Duplicate lead"
+    )
     if primary.id == duplicate.id:
         raise HTTPException(status_code=422, detail="A lead cannot be merged into itself")
     duplicate.status = "archived"
     duplicate.tags = list(set(duplicate.tags + [f"merged_into:{primary.id}"]))
-    audit(db, current.organization_id, current.email, "lead.merged", "lead", primary.id, {"duplicate_lead_id": duplicate.id})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "lead.merged",
+        "lead",
+        primary.id,
+        {"duplicate_lead_id": duplicate.id},
+    )
     db.commit()
     return {"primary": lead_dict(primary), "merged": duplicate.id}
 
 
 @app.get(f"{settings.api_prefix}/leads/pipeline")
 def lead_pipeline(db: Db, current: Current) -> dict[str, Any]:
-    statuses = ["new", "contacted", "qualified", "appointment_booked", "follow_up_required", "human_review", "disqualified", "won", "lost", "archived"]
+    statuses = [
+        "new",
+        "contacted",
+        "qualified",
+        "appointment_booked",
+        "follow_up_required",
+        "human_review",
+        "disqualified",
+        "won",
+        "lost",
+        "archived",
+    ]
     return {
         "columns": [
             {
                 "status": status,
-                "count": db.query(Lead).filter(Lead.organization_id == current.organization_id, Lead.status == status).count(),
+                "count": db.query(Lead)
+                .filter(Lead.organization_id == current.organization_id, Lead.status == status)
+                .count(),
                 "leads": [
                     lead_dict(lead)
                     for lead in db.query(Lead)
@@ -1258,18 +1701,40 @@ def lead_pipeline(db: Db, current: Current) -> dict[str, Any]:
 
 
 @app.get(f"{settings.api_prefix}/leads/export", response_class=PlainTextResponse)
-def export_leads(db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))]) -> str:
+def export_leads(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))]
+) -> str:
     rows = ["id,name,service_type,status,score,owner,crm_sync_status"]
-    for lead in db.query(Lead).filter(Lead.organization_id == current.organization_id).order_by(Lead.created_at.desc()).all():
+    for lead in (
+        db.query(Lead)
+        .filter(Lead.organization_id == current.organization_id)
+        .order_by(Lead.created_at.desc())
+        .all()
+    ):
         safe_name = redact_pii(lead.name).replace(",", " ")
-        rows.append(f"{lead.id},{safe_name},{lead.service_type},{lead.status},{lead.score},{lead.owner},{lead.crm_sync_status}")
-    audit(db, current.organization_id, current.email, "lead.exported", "lead_export", f"export-{uuid4().hex[:8]}")
+        rows.append(
+            f"{lead.id},{safe_name},{lead.service_type},{lead.status},{lead.score},{lead.owner},{lead.crm_sync_status}"
+        )
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "lead.exported",
+        "lead_export",
+        f"export-{uuid4().hex[:8]}",
+    )
     db.commit()
     return "\n".join(rows)
 
 
 @app.post(f"{settings.api_prefix}/leads/{{lead_id}}/crm-sync")
-def crm_sync(lead_id: str, payload: CrmSyncInput, db: Db, current: Annotated[Principal, Depends(require_permissions("leads:manage"))], x_idempotency_key: Annotated[str | None, Header()] = None) -> dict[str, Any]:
+def crm_sync(
+    lead_id: str,
+    payload: CrmSyncInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("leads:manage"))],
+    x_idempotency_key: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
     lead = require_org_record(db.get(Lead, lead_id), current.organization_id, "Lead")
     key = payload.idempotency_key or x_idempotency_key or f"manual-{lead.id}-{uuid4().hex[:8]}"
     job = enqueue_mock_crm_sync(db, current.organization_id, lead, key, payload.simulate_failure)
@@ -1278,26 +1743,48 @@ def crm_sync(lead_id: str, payload: CrmSyncInput, db: Db, current: Annotated[Pri
 
 @app.get(f"{settings.api_prefix}/integrations/jobs")
 def integration_jobs(db: Db, current: Current, status: str | None = None) -> dict[str, Any]:
-    query = db.query(IntegrationJob).filter(IntegrationJob.organization_id == current.organization_id)
+    query = db.query(IntegrationJob).filter(
+        IntegrationJob.organization_id == current.organization_id
+    )
     if status:
         query = query.filter(IntegrationJob.status == status)
-    return {"items": [job_dict(job) for job in query.order_by(IntegrationJob.created_at.desc()).all()]}
+    return {
+        "items": [job_dict(job) for job in query.order_by(IntegrationJob.created_at.desc()).all()]
+    }
 
 
 @app.post(f"{settings.api_prefix}/integrations/jobs/{{job_id}}/retry")
-def retry_integration_job(job_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]) -> dict[str, Any]:
-    job = require_org_record(db.get(IntegrationJob, job_id), current.organization_id, "Integration job")
+def retry_integration_job(
+    job_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("providers:manage"))],
+) -> dict[str, Any]:
+    job = require_org_record(
+        db.get(IntegrationJob, job_id), current.organization_id, "Integration job"
+    )
     retried = retry_mock_job(db, job)
     return {"job": job_dict(retried), "mode": "local_mock_crm", "idempotent": True}
 
 
 @app.get(f"{settings.api_prefix}/appointments")
 def list_appointments(db: Db, current: Current) -> dict[str, Any]:
-    items = db.query(Appointment).filter(Appointment.organization_id == current.organization_id).order_by(Appointment.start_time).all()
+    items = (
+        db.query(Appointment)
+        .filter(Appointment.organization_id == current.organization_id)
+        .order_by(Appointment.start_time)
+        .all()
+    )
     return {"items": [appointment_dict(appointment) for appointment in items]}
 
 
-def _appointment_conflict(db: Session, organization_id: str, assignee: str, start_time: datetime, end_time: datetime, exclude_id: str | None = None) -> Appointment | None:
+def _appointment_conflict(
+    db: Session,
+    organization_id: str,
+    assignee: str,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_id: str | None = None,
+) -> Appointment | None:
     query = db.query(Appointment).filter(
         Appointment.organization_id == organization_id,
         Appointment.assignee == assignee,
@@ -1311,12 +1798,18 @@ def _appointment_conflict(db: Session, organization_id: str, assignee: str, star
 
 
 @app.post(f"{settings.api_prefix}/appointments", status_code=201)
-def create_appointment(payload: AppointmentInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calendar:manage"))]) -> dict[str, Any]:
+def create_appointment(
+    payload: AppointmentInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calendar:manage"))],
+) -> dict[str, Any]:
     if payload.end_time <= payload.start_time:
         raise HTTPException(status_code=422, detail="Appointment end must be after start")
     if payload.lead_id:
         require_org_record(db.get(Lead, payload.lead_id), current.organization_id, "Lead")
-    conflict = _appointment_conflict(db, current.organization_id, payload.assignee, payload.start_time, payload.end_time)
+    conflict = _appointment_conflict(
+        db, current.organization_id, payload.assignee, payload.start_time, payload.end_time
+    )
     if conflict:
         db.add(
             BookingAttempt(
@@ -1331,7 +1824,13 @@ def create_appointment(payload: AppointmentInput, db: Db, current: Annotated[Pri
             )
         )
         db.commit()
-        raise HTTPException(status_code=409, detail={"message": "Calendar conflict detected", "conflicting_appointment_id": conflict.id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Calendar conflict detected",
+                "conflicting_appointment_id": conflict.id,
+            },
+        )
     appointment = Appointment(
         id=f"apt-{uuid4().hex[:12]}",
         organization_id=current.organization_id,
@@ -1353,32 +1852,78 @@ def create_appointment(payload: AppointmentInput, db: Db, current: Annotated[Pri
             idempotency_key=f"booking-{appointment.id}",
         )
     )
-    audit(db, current.organization_id, current.email, "appointment.booked", "appointment", appointment.id, {"provider": "mock_local_calendar"})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "appointment.booked",
+        "appointment",
+        appointment.id,
+        {"provider": "mock_local_calendar"},
+    )
     db.commit()
-    return {"appointment": appointment_dict(appointment), "provider_mode": "fully_working_local_mock"}
+    return {
+        "appointment": appointment_dict(appointment),
+        "provider_mode": "fully_working_local_mock",
+    }
 
 
 @app.post(f"{settings.api_prefix}/appointments/{{appointment_id}}/reschedule")
-def reschedule(appointment_id: str, payload: RescheduleInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calendar:manage"))]) -> dict[str, Any]:
-    appointment = require_org_record(db.get(Appointment, appointment_id), current.organization_id, "Appointment")
+def reschedule(
+    appointment_id: str,
+    payload: RescheduleInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calendar:manage"))],
+) -> dict[str, Any]:
+    appointment = require_org_record(
+        db.get(Appointment, appointment_id), current.organization_id, "Appointment"
+    )
     assignee = payload.assignee or appointment.assignee
-    conflict = _appointment_conflict(db, current.organization_id, assignee, payload.start_time, payload.end_time, appointment.id)
+    conflict = _appointment_conflict(
+        db, current.organization_id, assignee, payload.start_time, payload.end_time, appointment.id
+    )
     if conflict:
-        raise HTTPException(status_code=409, detail={"message": "Calendar conflict detected", "conflicting_appointment_id": conflict.id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Calendar conflict detected",
+                "conflicting_appointment_id": conflict.id,
+            },
+        )
     appointment.start_time = payload.start_time
     appointment.end_time = payload.end_time
     appointment.assignee = assignee
     appointment.status = "rescheduled"
-    audit(db, current.organization_id, current.email, "appointment.rescheduled", "appointment", appointment.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "appointment.rescheduled",
+        "appointment",
+        appointment.id,
+    )
     db.commit()
     return appointment_dict(appointment)
 
 
 @app.post(f"{settings.api_prefix}/appointments/{{appointment_id}}/cancel")
-def cancel(appointment_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("calendar:manage"))]) -> dict[str, str]:
-    appointment = require_org_record(db.get(Appointment, appointment_id), current.organization_id, "Appointment")
+def cancel(
+    appointment_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calendar:manage"))],
+) -> dict[str, str]:
+    appointment = require_org_record(
+        db.get(Appointment, appointment_id), current.organization_id, "Appointment"
+    )
     appointment.status = "cancelled"
-    audit(db, current.organization_id, current.email, "appointment.cancelled", "appointment", appointment.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "appointment.cancelled",
+        "appointment",
+        appointment.id,
+    )
     db.commit()
     return {"id": appointment.id, "status": "cancelled"}
 
@@ -1396,36 +1941,118 @@ def availability(current: Current) -> dict[str, Any]:
 
 @app.get(f"{settings.api_prefix}/appointments/booking-attempts")
 def booking_attempts(db: Db, current: Current) -> dict[str, Any]:
-    items = db.query(BookingAttempt).filter(BookingAttempt.organization_id == current.organization_id).order_by(BookingAttempt.created_at.desc()).all()
-    return {"items": [{"id": item.id, "status": item.status, "reason": item.reason, "provider": item.provider, "appointment_id": item.appointment_id} for item in items]}
+    items = (
+        db.query(BookingAttempt)
+        .filter(BookingAttempt.organization_id == current.organization_id)
+        .order_by(BookingAttempt.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "status": item.status,
+                "reason": item.reason,
+                "provider": item.provider,
+                "appointment_id": item.appointment_id,
+            }
+            for item in items
+        ]
+    }
 
 
 # ------------------- Supervisor, queues, routing -------------------
 
 
 @app.get(f"{settings.api_prefix}/supervisor/overview")
-def supervisor_overview(db: Db, current: Annotated[Principal, Depends(require_permissions("calls:read"))]) -> dict[str, Any]:
-    active_states = ["queued", "ringing", "connected", "listening", "reasoning", "speaking", "booking", "handoff_pending", "human_takeover"]
-    active_calls = db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.status.in_(active_states)).order_by(CallSession.created_at.desc()).all()
-    escalated = db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.escalation_level.in_(["emergency", "human", "human_takeover", "human_review"])).order_by(CallSession.created_at.desc()).limit(20).all()
-    review = db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.outcome.in_(["needs_review", "transferred", "escalated"])).limit(20).all()
+def supervisor_overview(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("calls:read"))]
+) -> dict[str, Any]:
+    active_states = [
+        "queued",
+        "ringing",
+        "connected",
+        "listening",
+        "reasoning",
+        "speaking",
+        "booking",
+        "handoff_pending",
+        "human_takeover",
+    ]
+    active_calls = (
+        db.query(CallSession)
+        .filter(
+            CallSession.organization_id == current.organization_id,
+            CallSession.status.in_(active_states),
+        )
+        .order_by(CallSession.created_at.desc())
+        .all()
+    )
+    escalated = (
+        db.query(CallSession)
+        .filter(
+            CallSession.organization_id == current.organization_id,
+            CallSession.escalation_level.in_(
+                ["emergency", "human", "human_takeover", "human_review"]
+            ),
+        )
+        .order_by(CallSession.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    review = (
+        db.query(CallSession)
+        .filter(
+            CallSession.organization_id == current.organization_id,
+            CallSession.outcome.in_(["needs_review", "transferred", "escalated"]),
+        )
+        .limit(20)
+        .all()
+    )
     queues = db.query(CallQueue).filter(CallQueue.organization_id == current.organization_id).all()
     return {
         "active_calls": [call_dict(call) for call in active_calls],
-        "waiting_calls": [call_dict(call) for call in active_calls if call.status in {"queued", "ringing"}],
+        "waiting_calls": [
+            call_dict(call) for call in active_calls if call.status in {"queued", "ringing"}
+        ],
         "escalated_calls": [call_dict(call) for call in escalated],
         "calls_requiring_review": [call_dict(call) for call in review],
-        "agent_status": {"available": 5, "busy": len(active_calls), "offline": 0, "synthetic": True},
-        "queue_status": [{"id": queue.id, "name": queue.name, "sla_seconds": queue.sla_seconds, "active": queue.is_active} for queue in queues],
+        "agent_status": {
+            "available": 5,
+            "busy": len(active_calls),
+            "offline": 0,
+            "synthetic": True,
+        },
+        "queue_status": [
+            {
+                "id": queue.id,
+                "name": queue.name,
+                "sla_seconds": queue.sla_seconds,
+                "active": queue.is_active,
+            }
+            for queue in queues
+        ],
     }
 
 
 @app.get(f"{settings.api_prefix}/queues")
 def list_queues(db: Db, current: Current) -> dict[str, Any]:
-    queues = db.query(CallQueue).filter(CallQueue.organization_id == current.organization_id).order_by(CallQueue.priority).all()
+    queues = (
+        db.query(CallQueue)
+        .filter(CallQueue.organization_id == current.organization_id)
+        .order_by(CallQueue.priority)
+        .all()
+    )
     items = []
     for queue in queues:
-        waiting = db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.status.in_(["queued", "ringing"])).count()
+        waiting = (
+            db.query(CallSession)
+            .filter(
+                CallSession.organization_id == current.organization_id,
+                CallSession.status.in_(["queued", "ringing"]),
+            )
+            .count()
+        )
         items.append(
             {
                 "id": queue.id,
@@ -1449,7 +2076,14 @@ def queue_operations(db: Db, current: Current) -> dict[str, Any]:
     queues = list_queues(db, current)["items"]
     return {
         "queues": queues,
-        "trend": [{"hour": f"{hour:02d}:00", "volume": 9 + (hour * 3) % 18, "wait_seconds": 22 + (hour * 5) % 45} for hour in range(8, 19)],
+        "trend": [
+            {
+                "hour": f"{hour:02d}:00",
+                "volume": 9 + (hour * 3) % 18,
+                "wait_seconds": 22 + (hour * 5) % 45,
+            }
+            for hour in range(8, 19)
+        ],
         "business_hours_status": "open" if 8 <= datetime.utcnow().hour <= 18 else "after_hours",
         "note": "Queue telemetry is a deterministic synthetic demo estimate; no carrier queue is connected.",
     }
@@ -1457,36 +2091,98 @@ def queue_operations(db: Db, current: Current) -> dict[str, Any]:
 
 @app.get(f"{settings.api_prefix}/routing/rules")
 def list_routing_rules(db: Db, current: Current) -> dict[str, Any]:
-    rules = db.query(RoutingRule).filter(RoutingRule.organization_id == current.organization_id).order_by(RoutingRule.priority).all()
-    return {"items": [{"id": rule.id, "name": rule.name, "condition": rule.condition, "priority": rule.priority, "destination_type": rule.destination_type, "destination": rule.destination, "fallback": rule.fallback, "notification": rule.notification, "audit_required": rule.audit_required, "is_active": rule.is_active} for rule in rules]}
+    rules = (
+        db.query(RoutingRule)
+        .filter(RoutingRule.organization_id == current.organization_id)
+        .order_by(RoutingRule.priority)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": rule.id,
+                "name": rule.name,
+                "condition": rule.condition,
+                "priority": rule.priority,
+                "destination_type": rule.destination_type,
+                "destination": rule.destination,
+                "fallback": rule.fallback,
+                "notification": rule.notification,
+                "audit_required": rule.audit_required,
+                "is_active": rule.is_active,
+            }
+            for rule in rules
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/routing/rules", status_code=201)
-def create_routing_rule(payload: RoutingRuleInput, db: Db, current: Annotated[Principal, Depends(require_permissions("routing:manage"))]) -> dict[str, Any]:
-    rule = RoutingRule(id=f"route-{uuid4().hex[:12]}", organization_id=current.organization_id, **payload.model_dump(), is_active=True)
+def create_routing_rule(
+    payload: RoutingRuleInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("routing:manage"))],
+) -> dict[str, Any]:
+    rule = RoutingRule(
+        id=f"route-{uuid4().hex[:12]}",
+        organization_id=current.organization_id,
+        **payload.model_dump(),
+        is_active=True,
+    )
     db.add(rule)
-    audit(db, current.organization_id, current.email, "routing.rule_created", "routing_rule", rule.id)
+    audit(
+        db, current.organization_id, current.email, "routing.rule_created", "routing_rule", rule.id
+    )
     db.commit()
     return {"id": rule.id, "name": rule.name, "condition": rule.condition}
 
 
 @app.post(f"{settings.api_prefix}/routing/evaluate")
-def evaluate_routing_rule(payload: RoutingEvaluateInput, db: Db, current: Current) -> dict[str, Any]:
+def evaluate_routing_rule(
+    payload: RoutingEvaluateInput, db: Db, current: Current
+) -> dict[str, Any]:
     decision = evaluate_routing(db, current.organization_id, payload.context)
-    return {"matched": decision.matched, "rule_id": decision.rule_id, "rule_name": decision.rule_name, "destination_type": decision.destination_type, "destination": decision.destination, "fallback": decision.fallback, "notification": decision.notification, "reason": decision.reason, "mode": "deterministic_policy_engine"}
+    return {
+        "matched": decision.matched,
+        "rule_id": decision.rule_id,
+        "rule_name": decision.rule_name,
+        "destination_type": decision.destination_type,
+        "destination": decision.destination,
+        "fallback": decision.fallback,
+        "notification": decision.notification,
+        "reason": decision.reason,
+        "mode": "deterministic_policy_engine",
+    }
 
 
 @app.get(f"{settings.api_prefix}/routing/handoff-analytics")
 def handoff_analytics(db: Db, current: Current) -> dict[str, Any]:
-    total = db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count() or 1
-    handoffs = db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.outcome.in_(["transferred", "escalated", "needs_review"])).count()
+    total = (
+        db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count()
+        or 1
+    )
+    handoffs = (
+        db.query(CallSession)
+        .filter(
+            CallSession.organization_id == current.organization_id,
+            CallSession.outcome.in_(["transferred", "escalated", "needs_review"]),
+        )
+        .count()
+    )
     return {
         "handoff_rate": round(handoffs / total * 100, 1),
         "time_to_human_response_seconds": 46,
         "resolved_after_handoff_rate": 82.4,
         "abandoned_after_handoff_rate": 4.1,
-        "reasons": [{"reason": "Low confidence", "count": 18}, {"reason": "Emergency", "count": 12}, {"reason": "Restricted topic", "count": 9}],
-        "policy_trigger_frequency": [{"trigger": "emergency", "count": 12}, {"trigger": "booking_failure", "count": 8}, {"trigger": "consent", "count": 4}],
+        "reasons": [
+            {"reason": "Low confidence", "count": 18},
+            {"reason": "Emergency", "count": 12},
+            {"reason": "Restricted topic", "count": 9},
+        ],
+        "policy_trigger_frequency": [
+            {"trigger": "emergency", "count": 12},
+            {"trigger": "booking_failure", "count": 8},
+            {"trigger": "consent", "count": 4},
+        ],
         "synthetic": True,
     }
 
@@ -1495,10 +2191,15 @@ def handoff_analytics(db: Db, current: Current) -> dict[str, Any]:
 
 
 @app.get(f"{settings.api_prefix}/quality/review-queue")
-def review_queue(db: Db, current: Annotated[Principal, Depends(require_permissions("quality:review"))]) -> dict[str, Any]:
+def review_queue(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("quality:review"))]
+) -> dict[str, Any]:
     calls = (
         db.query(CallSession)
-        .filter(CallSession.organization_id == current.organization_id, CallSession.outcome.in_(["needs_review", "escalated", "transferred"]))
+        .filter(
+            CallSession.organization_id == current.organization_id,
+            CallSession.outcome.in_(["needs_review", "escalated", "transferred"]),
+        )
         .order_by(CallSession.created_at.desc())
         .limit(50)
         .all()
@@ -1508,49 +2209,160 @@ def review_queue(db: Db, current: Annotated[Principal, Depends(require_permissio
 
 @app.get(f"{settings.api_prefix}/quality/rubrics")
 def quality_rubrics(db: Db, current: Current) -> dict[str, Any]:
-    rubrics = db.query(QualityRubric).filter(QualityRubric.organization_id == current.organization_id).all()
-    return {"items": [{"id": rubric.id, "name": rubric.name, "version": rubric.version, "dimensions": rubric.dimensions, "is_active": rubric.is_active} for rubric in rubrics]}
+    rubrics = (
+        db.query(QualityRubric)
+        .filter(QualityRubric.organization_id == current.organization_id)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": rubric.id,
+                "name": rubric.name,
+                "version": rubric.version,
+                "dimensions": rubric.dimensions,
+                "is_active": rubric.is_active,
+            }
+            for rubric in rubrics
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/quality/evaluation-suites")
 def quality_suites(db: Db, current: Current) -> dict[str, Any]:
-    suites = db.query(EvaluationSuite).filter(EvaluationSuite.organization_id == current.organization_id).all()
-    return {"items": [{"id": suite.id, "name": suite.name, "use_case": suite.use_case, "rubric_version": suite.rubric_version, "case_count": len(suite.cases), "cases": suite.cases} for suite in suites]}
+    suites = (
+        db.query(EvaluationSuite)
+        .filter(EvaluationSuite.organization_id == current.organization_id)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": suite.id,
+                "name": suite.name,
+                "use_case": suite.use_case,
+                "rubric_version": suite.rubric_version,
+                "case_count": len(suite.cases),
+                "cases": suite.cases,
+            }
+            for suite in suites
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/quality/evaluation-runs")
 def evaluation_runs(db: Db, current: Current) -> dict[str, Any]:
-    runs = db.query(EvaluationRun).filter(EvaluationRun.organization_id == current.organization_id).order_by(EvaluationRun.created_at.desc()).all()
-    return {"items": [{"id": run.id, "suite_id": run.suite_id, "agent_version_id": run.agent_version_id, "status": run.status, "pass_rate": run.pass_rate, "critical_failures": run.critical_failures, "result": run.result_json} for run in runs]}
+    runs = (
+        db.query(EvaluationRun)
+        .filter(EvaluationRun.organization_id == current.organization_id)
+        .order_by(EvaluationRun.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": run.id,
+                "suite_id": run.suite_id,
+                "agent_version_id": run.agent_version_id,
+                "status": run.status,
+                "pass_rate": run.pass_rate,
+                "critical_failures": run.critical_failures,
+                "result": run.result_json,
+            }
+            for run in runs
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/quality/coaching", status_code=201)
-def create_coaching_task(payload: CoachingInput, db: Db, current: Annotated[Principal, Depends(require_permissions("quality:manage"))]) -> dict[str, Any]:
+def create_coaching_task(
+    payload: CoachingInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("quality:manage"))],
+) -> dict[str, Any]:
     if payload.call_id:
         require_org_record(db.get(CallSession, payload.call_id), current.organization_id, "Call")
     if payload.agent_version_id:
-        require_org_record(db.get(AgentVersion, payload.agent_version_id), current.organization_id, "Agent version")
-    task = CoachingTask(id=f"coaching-{uuid4().hex[:12]}", organization_id=current.organization_id, **payload.model_dump(), status="open")
+        require_org_record(
+            db.get(AgentVersion, payload.agent_version_id), current.organization_id, "Agent version"
+        )
+    task = CoachingTask(
+        id=f"coaching-{uuid4().hex[:12]}",
+        organization_id=current.organization_id,
+        **payload.model_dump(),
+        status="open",
+    )
     db.add(task)
-    audit(db, current.organization_id, current.email, "coaching.task_created", "coaching_task", task.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "coaching.task_created",
+        "coaching_task",
+        task.id,
+    )
     db.commit()
     return {"id": task.id, "status": task.status, "title": task.title}
 
 
 @app.get(f"{settings.api_prefix}/quality/coaching")
 def coaching_tasks(db: Db, current: Current) -> dict[str, Any]:
-    tasks = db.query(CoachingTask).filter(CoachingTask.organization_id == current.organization_id).order_by(CoachingTask.due_at).all()
-    return {"items": [{"id": task.id, "title": task.title, "owner": task.owner, "remediation": task.remediation, "due_at": task.due_at.isoformat() if task.due_at else None, "status": task.status, "call_id": task.call_id, "agent_version_id": task.agent_version_id} for task in tasks]}
+    tasks = (
+        db.query(CoachingTask)
+        .filter(CoachingTask.organization_id == current.organization_id)
+        .order_by(CoachingTask.due_at)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": task.id,
+                "title": task.title,
+                "owner": task.owner,
+                "remediation": task.remediation,
+                "due_at": task.due_at.isoformat() if task.due_at else None,
+                "status": task.status,
+                "call_id": task.call_id,
+                "agent_version_id": task.agent_version_id,
+            }
+            for task in tasks
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/governance/audit-events")
-def audit_events(db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))], limit: int = Query(100, ge=1, le=500)) -> dict[str, Any]:
-    events = db.query(AuditEvent).filter(AuditEvent.organization_id == current.organization_id).order_by(AuditEvent.created_at.desc()).limit(limit).all()
-    return {"items": [{"id": event.id, "actor": event.actor, "action": event.action, "entity_type": event.entity_type, "entity_id": event.entity_id, "detail": event.detail, "created_at": event.created_at.isoformat()} for event in events]}
+def audit_events(
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("governance:manage"))],
+    limit: int = Query(100, ge=1, le=500),
+) -> dict[str, Any]:
+    events = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.organization_id == current.organization_id)
+        .order_by(AuditEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": event.id,
+                "actor": event.actor,
+                "action": event.action,
+                "entity_type": event.entity_type,
+                "entity_id": event.entity_id,
+                "detail": event.detail,
+                "created_at": event.created_at.isoformat(),
+            }
+            for event in events
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/governance/roles-users")
-def roles_users(db: Db, current: Annotated[Principal, Depends(require_permissions("workspace:manage"))]) -> dict[str, Any]:
+def roles_users(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("workspace:manage"))]
+) -> dict[str, Any]:
     memberships = (
         db.query(OrganizationMembership, User)
         .join(User, User.id == OrganizationMembership.user_id)
@@ -1558,8 +2370,19 @@ def roles_users(db: Db, current: Annotated[Principal, Depends(require_permission
         .all()
     )
     return {
-        "users": [{"email": user.email, "name": user.name, "role": membership.role, "active": membership.is_active} for membership, user in memberships],
-        "roles": [{"name": name, "permissions": sorted(values)} for name, values in permission_set.__globals__["ROLE_PERMISSIONS"].items()],
+        "users": [
+            {
+                "email": user.email,
+                "name": user.name,
+                "role": membership.role,
+                "active": membership.is_active,
+            }
+            for membership, user in memberships
+        ],
+        "roles": [
+            {"name": name, "permissions": sorted(values)}
+            for name, values in permission_set.__globals__["ROLE_PERMISSIONS"].items()
+        ],
     }
 
 
@@ -1572,7 +2395,9 @@ def analytics_overview(db: Db, current: Current) -> dict[str, Any]:
     total = query.count()
     booked = query.filter(CallSession.outcome == "booked").count()
     qualified = query.filter(CallSession.outcome.in_(["qualified", "booked"])).count()
-    handoff = query.filter(CallSession.outcome.in_(["transferred", "escalated", "needs_review"])).count()
+    handoff = query.filter(
+        CallSession.outcome.in_(["transferred", "escalated", "needs_review"])
+    ).count()
     avg_duration = query.with_entities(func.avg(CallSession.duration_seconds)).scalar() or 0
     avg_quality = query.with_entities(func.avg(CallSession.quality_score)).scalar() or 0
     abandoned = query.filter(CallSession.status == "abandoned").count()
@@ -1597,23 +2422,64 @@ def analytics_overview(db: Db, current: Current) -> dict[str, Any]:
 
 @app.get(f"{settings.api_prefix}/analytics/trends")
 def call_trends(current: Current) -> dict[str, Any]:
-    return {"organization_id": current.organization_id, "items": [{"date": f"2026-07-{day:02d}", "calls": 42 + (day * 7) % 28, "bookings": 7 + (day * 3) % 11, "quality": 82 + (day % 8)} for day in range(1, 15)]}
+    return {
+        "organization_id": current.organization_id,
+        "items": [
+            {
+                "date": f"2026-07-{day:02d}",
+                "calls": 42 + (day * 7) % 28,
+                "bookings": 7 + (day * 3) % 11,
+                "quality": 82 + (day % 8),
+            }
+            for day in range(1, 15)
+        ],
+    }
 
 
 @app.get(f"{settings.api_prefix}/analytics/funnel")
 def funnel(db: Db, current: Current) -> dict[str, Any]:
-    total = db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count()
-    return {"items": [{"stage": "Answered", "value": total}, {"stage": "Qualified", "value": int(total * 0.67)}, {"stage": "Booked", "value": int(total * 0.38)}, {"stage": "Resolved by AI", "value": int(total * 0.71)}, {"stage": "Human handoff", "value": int(total * 0.29)}]}
+    total = (
+        db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count()
+    )
+    return {
+        "items": [
+            {"stage": "Answered", "value": total},
+            {"stage": "Qualified", "value": int(total * 0.67)},
+            {"stage": "Booked", "value": int(total * 0.38)},
+            {"stage": "Resolved by AI", "value": int(total * 0.71)},
+            {"stage": "Human handoff", "value": int(total * 0.29)},
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/analytics/quality")
 def quality_metrics(db: Db, current: Current) -> dict[str, Any]:
-    quality_ids = [row[0] for row in db.query(CallSession.id).filter(CallSession.organization_id == current.organization_id).all()]
+    quality_ids = [
+        row[0]
+        for row in db.query(CallSession.id)
+        .filter(CallSession.organization_id == current.organization_id)
+        .all()
+    ]
     return {
         "flags": {
-            "low_transcription_confidence": db.query(QualityEvaluation).filter(QualityEvaluation.call_id.in_(quality_ids), QualityEvaluation.transcript_completeness < 65).count(),
-            "policy_review": db.query(QualityEvaluation).filter(QualityEvaluation.call_id.in_(quality_ids), QualityEvaluation.policy_risk == "medium").count(),
-            "hallucination_risk": db.query(QualityEvaluation).filter(QualityEvaluation.call_id.in_(quality_ids), QualityEvaluation.hallucination_risk != "low").count(),
+            "low_transcription_confidence": db.query(QualityEvaluation)
+            .filter(
+                QualityEvaluation.call_id.in_(quality_ids),
+                QualityEvaluation.transcript_completeness < 65,
+            )
+            .count(),
+            "policy_review": db.query(QualityEvaluation)
+            .filter(
+                QualityEvaluation.call_id.in_(quality_ids),
+                QualityEvaluation.policy_risk == "medium",
+            )
+            .count(),
+            "hallucination_risk": db.query(QualityEvaluation)
+            .filter(
+                QualityEvaluation.call_id.in_(quality_ids),
+                QualityEvaluation.hallucination_risk != "low",
+            )
+            .count(),
         },
         "latency": {"stt_ms": 210, "reasoning_ms": 310, "tts_ms": 222},
         "note": "All values use synthetic evaluation records and rule-assisted signals in demo mode.",
@@ -1622,13 +2488,34 @@ def quality_metrics(db: Db, current: Current) -> dict[str, Any]:
 
 @app.get(f"{settings.api_prefix}/analytics/agent-comparison")
 def agent_comparison(db: Db, current: Current) -> dict[str, Any]:
-    agents = db.query(VoiceAgent).filter(VoiceAgent.organization_id == current.organization_id).all()
-    return {"items": [{"agent": agent.name, "volume": 44 + index * 8, "resolution_rate": 70 + index * 4, "qualification_rate": 62 + index * 5, "booking_rate": 28 + index * 3, "handoff_rate": 21 - index, "average_latency_ms": 690 + index * 30, "quality_score": 87 + index, "compliance_flags": index, "cost_estimate_usd": round(7.4 + index * 1.2, 2), "synthetic": True} for index, agent in enumerate(agents)]}
+    agents = (
+        db.query(VoiceAgent).filter(VoiceAgent.organization_id == current.organization_id).all()
+    )
+    return {
+        "items": [
+            {
+                "agent": agent.name,
+                "volume": 44 + index * 8,
+                "resolution_rate": 70 + index * 4,
+                "qualification_rate": 62 + index * 5,
+                "booking_rate": 28 + index * 3,
+                "handoff_rate": 21 - index,
+                "average_latency_ms": 690 + index * 30,
+                "quality_score": 87 + index,
+                "compliance_flags": index,
+                "cost_estimate_usd": round(7.4 + index * 1.2, 2),
+                "synthetic": True,
+            }
+            for index, agent in enumerate(agents)
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/analytics/forecast")
 def forecast(db: Db, current: Current) -> dict[str, Any]:
-    volume = db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count()
+    volume = (
+        db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count()
+    )
     return {
         "label": "Baseline forecast — trend-based projection — synthetic demo estimate",
         "expected_inbound_calls": int(volume / 7 * 1.08),
@@ -1645,11 +2532,32 @@ def alerts(db: Db, current: Current, status: str | None = None) -> dict[str, Any
     if status:
         query = query.filter(Alert.status == status)
     items = query.order_by(Alert.created_at.desc()).all()
-    return {"items": [{"id": item.id, "category": item.category, "severity": item.severity, "title": item.title, "detail": item.detail, "status": item.status, "entity_type": item.entity_type, "entity_id": item.entity_id, "assignee": item.assignee, "created_at": item.created_at.isoformat()} for item in items]}
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "category": item.category,
+                "severity": item.severity,
+                "title": item.title,
+                "detail": item.detail,
+                "status": item.status,
+                "entity_type": item.entity_type,
+                "entity_id": item.entity_id,
+                "assignee": item.assignee,
+                "created_at": item.created_at.isoformat(),
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/alerts/{{alert_id}}/action")
-def alert_action(alert_id: str, payload: AlertActionInput, db: Db, current: Annotated[Principal, Depends(require_permissions("calls:read"))]) -> dict[str, Any]:
+def alert_action(
+    alert_id: str,
+    payload: AlertActionInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("calls:read"))],
+) -> dict[str, Any]:
     alert = require_org_record(db.get(Alert, alert_id), current.organization_id, "Alert")
     if payload.action not in {"acknowledged", "snoozed", "resolved"}:
         raise HTTPException(status_code=422, detail="Unsupported alert action")
@@ -1661,116 +2569,361 @@ def alert_action(alert_id: str, payload: AlertActionInput, db: Db, current: Anno
 
 @app.get(f"{settings.api_prefix}/notifications")
 def notifications(db: Db, current: Current) -> dict[str, Any]:
-    items = db.query(Notification).filter(Notification.organization_id == current.organization_id).order_by(Notification.created_at.desc()).all()
-    return {"items": [{"id": item.id, "category": item.category, "title": item.title, "body": item.body, "read_at": item.read_at.isoformat() if item.read_at else None, "delivery": item.delivery} for item in items]}
+    items = (
+        db.query(Notification)
+        .filter(Notification.organization_id == current.organization_id)
+        .order_by(Notification.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "category": item.category,
+                "title": item.title,
+                "body": item.body,
+                "read_at": item.read_at.isoformat() if item.read_at else None,
+                "delivery": item.delivery,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/reports")
-def reports(db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]) -> dict[str, Any]:
-    items = db.query(Report).filter(Report.organization_id == current.organization_id).order_by(Report.created_at.desc()).all()
-    return {"items": [{"id": item.id, "report_type": item.report_type, "title": item.title, "date_range": item.date_range, "generated_by": item.generated_by, "data_freshness": item.data_freshness, "content": item.content_json, "export_id": item.export_id, "created_at": item.created_at.isoformat()} for item in items]}
+def reports(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]
+) -> dict[str, Any]:
+    items = (
+        db.query(Report)
+        .filter(Report.organization_id == current.organization_id)
+        .order_by(Report.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "report_type": item.report_type,
+                "title": item.title,
+                "date_range": item.date_range,
+                "generated_by": item.generated_by,
+                "data_freshness": item.data_freshness,
+                "content": item.content_json,
+                "export_id": item.export_id,
+                "created_at": item.created_at.isoformat(),
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/reports/generate", status_code=201)
-def create_report(payload: ReportInput, db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]) -> dict[str, Any]:
+def create_report(
+    payload: ReportInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("reports:manage"))],
+) -> dict[str, Any]:
     report = generate_report(db, current.organization_id, payload.report_type, current.email)
     audit(db, current.organization_id, current.email, "report.generated", "report", report.id)
     db.commit()
-    return {"id": report.id, "title": report.title, "content": report.content_json, "note": "Generated locally from synthetic demo data."}
+    return {
+        "id": report.id,
+        "title": report.title,
+        "content": report.content_json,
+        "note": "Generated locally from synthetic demo data.",
+    }
 
 
 @app.get(f"{settings.api_prefix}/reports/{{report_id}}/export")
 def export_report(report_id: str, db: Db, current: Current, format: str = "pdf") -> Response:
     report = require_org_record(db.get(Report, report_id), current.organization_id, "Report")
-    audit(db, current.organization_id, current.email, "report.exported", "report", report.id, {"format": format})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "report.exported",
+        "report",
+        report.id,
+        {"format": format},
+    )
     db.commit()
     if format == "csv":
-        rows = ["metric,value"] + [f"{key},{value}" for key, value in report.content_json.items() if not isinstance(value, (list, dict))]
+        rows = ["metric,value"] + [
+            f"{key},{value}"
+            for key, value in report.content_json.items()
+            if not isinstance(value, (list, dict))
+        ]
         return PlainTextResponse("\n".join(rows), media_type="text/csv")
     pdf = minimal_pdf(report.title, "Synthetic demo report. " + str(report.content_json))
-    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{report.export_id}.pdf"'})
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{report.export_id}.pdf"'},
+    )
 
 
 @app.get(f"{settings.api_prefix}/reports/schedules")
-def report_schedules(db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]) -> dict[str, Any]:
-    items = db.query(ScheduledReport).filter(ScheduledReport.organization_id == current.organization_id).all()
-    return {"items": [{"id": item.id, "report_type": item.report_type, "cadence": item.cadence, "next_run_at": item.next_run_at.isoformat(), "destination": item.destination, "is_active": item.is_active} for item in items]}
+def report_schedules(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]
+) -> dict[str, Any]:
+    items = (
+        db.query(ScheduledReport)
+        .filter(ScheduledReport.organization_id == current.organization_id)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "report_type": item.report_type,
+                "cadence": item.cadence,
+                "next_run_at": item.next_run_at.isoformat(),
+                "destination": item.destination,
+                "is_active": item.is_active,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/reports/schedules", status_code=201)
-def create_report_schedule(payload: ScheduleReportInput, db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]) -> dict[str, Any]:
-    schedule = ScheduledReport(id=f"schedule-{uuid4().hex[:12]}", organization_id=current.organization_id, **payload.model_dump(), is_active=True)
+def create_report_schedule(
+    payload: ScheduleReportInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("reports:manage"))],
+) -> dict[str, Any]:
+    schedule = ScheduledReport(
+        id=f"schedule-{uuid4().hex[:12]}",
+        organization_id=current.organization_id,
+        **payload.model_dump(),
+        is_active=True,
+    )
     db.add(schedule)
-    audit(db, current.organization_id, current.email, "report.schedule_created", "scheduled_report", schedule.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "report.schedule_created",
+        "scheduled_report",
+        schedule.id,
+    )
     db.commit()
-    return {"id": schedule.id, "next_run_at": schedule.next_run_at.isoformat(), "delivery": "in_app (simulated)"}
+    return {
+        "id": schedule.id,
+        "next_run_at": schedule.next_run_at.isoformat(),
+        "delivery": "in_app (simulated)",
+    }
 
 
 @app.post(f"{settings.api_prefix}/reports/schedules/{{schedule_id}}/run-now")
-def run_report_now(schedule_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("reports:manage"))]) -> dict[str, Any]:
-    schedule = require_org_record(db.get(ScheduledReport, schedule_id), current.organization_id, "Scheduled report")
+def run_report_now(
+    schedule_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("reports:manage"))],
+) -> dict[str, Any]:
+    schedule = require_org_record(
+        db.get(ScheduledReport, schedule_id), current.organization_id, "Scheduled report"
+    )
     report = generate_report(db, current.organization_id, schedule.report_type, current.email)
-    schedule.next_run_at = schedule.next_run_at + timedelta(days=7 if schedule.cadence == "weekly" else 1)
-    audit(db, current.organization_id, current.email, "report.schedule_run_now", "scheduled_report", schedule.id, {"report_id": report.id})
+    schedule.next_run_at = schedule.next_run_at + timedelta(
+        days=7 if schedule.cadence == "weekly" else 1
+    )
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "report.schedule_run_now",
+        "scheduled_report",
+        schedule.id,
+        {"report_id": report.id},
+    )
     db.commit()
-    return {"schedule_id": schedule.id, "report_id": report.id, "delivery": "in_app notification created; email delivery is a mock adapter unless configured."}
+    return {
+        "schedule_id": schedule.id,
+        "report_id": report.id,
+        "delivery": "in_app notification created; email delivery is a mock adapter unless configured.",
+    }
 
 
 # ------------------- Providers, security, privacy, developer surface -------------------
 
 
 @app.get(f"{settings.api_prefix}/providers")
-def providers(db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]) -> dict[str, Any]:
-    items = db.query(ProviderConfig).filter(ProviderConfig.organization_id == current.organization_id).order_by(ProviderConfig.provider_type).all()
-    return {"items": [{"id": item.id, "name": item.provider_name, "type": item.provider_type, "status": item.status, "environment": item.environment, "credential_state": item.credential_state, "last_health_check": item.last_health_check.isoformat() if item.last_health_check else None, "last_success_at": item.last_success_at.isoformat() if item.last_success_at else None, "failure_count": item.failure_count, "retry_policy": item.retry_policy, "settings": item.settings_json} for item in items]}
+def providers(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]
+) -> dict[str, Any]:
+    items = (
+        db.query(ProviderConfig)
+        .filter(ProviderConfig.organization_id == current.organization_id)
+        .order_by(ProviderConfig.provider_type)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "name": item.provider_name,
+                "type": item.provider_type,
+                "status": item.status,
+                "environment": item.environment,
+                "credential_state": item.credential_state,
+                "last_health_check": item.last_health_check.isoformat()
+                if item.last_health_check
+                else None,
+                "last_success_at": item.last_success_at.isoformat()
+                if item.last_success_at
+                else None,
+                "failure_count": item.failure_count,
+                "retry_policy": item.retry_policy,
+                "settings": item.settings_json,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/providers/{{provider_id}}/test")
-def test_provider(provider_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]) -> dict[str, Any]:
-    provider = require_org_record(db.get(ProviderConfig, provider_id), current.organization_id, "Provider")
+def test_provider(
+    provider_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("providers:manage"))],
+) -> dict[str, Any]:
+    provider = require_org_record(
+        db.get(ProviderConfig, provider_id), current.organization_id, "Provider"
+    )
     provider.last_health_check = datetime.utcnow()
     if provider.status == "demo_provider":
         provider.last_success_at = datetime.utcnow()
         outcome = "Local deterministic provider test passed."
     else:
-        outcome = "Adapter boundary reachable in demo mode; no credentialed external request was made."
-    audit(db, current.organization_id, current.email, "provider.health_checked", "provider", provider.id)
+        outcome = (
+            "Adapter boundary reachable in demo mode; no credentialed external request was made."
+        )
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "provider.health_checked",
+        "provider",
+        provider.id,
+    )
     db.commit()
     return {"provider_id": provider.id, "status": provider.status, "outcome": outcome}
 
 
 @app.post(f"{settings.api_prefix}/providers/{{provider_id}}/action")
-def provider_action(provider_id: str, payload: ProviderActionInput, db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]) -> dict[str, Any]:
-    provider = require_org_record(db.get(ProviderConfig, provider_id), current.organization_id, "Provider")
+def provider_action(
+    provider_id: str,
+    payload: ProviderActionInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("providers:manage"))],
+) -> dict[str, Any]:
+    provider = require_org_record(
+        db.get(ProviderConfig, provider_id), current.organization_id, "Provider"
+    )
     if payload.status and payload.status not in {"disabled", "not_configured", "demo_provider"}:
-        raise HTTPException(status_code=422, detail="Only safe demo statuses can be selected without credentials")
-    provider.status = payload.status or ("disabled" if provider.status != "disabled" else "not_configured")
-    audit(db, current.organization_id, current.email, "provider.status_changed", "provider", provider.id, {"status": provider.status})
+        raise HTTPException(
+            status_code=422, detail="Only safe demo statuses can be selected without credentials"
+        )
+    provider.status = payload.status or (
+        "disabled" if provider.status != "disabled" else "not_configured"
+    )
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "provider.status_changed",
+        "provider",
+        provider.id,
+        {"status": provider.status},
+    )
     db.commit()
     return {"id": provider.id, "status": provider.status}
 
 
 @app.get(f"{settings.api_prefix}/webhooks/deliveries")
-def webhook_logs(db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]) -> dict[str, Any]:
-    items = db.query(WebhookDelivery).filter(WebhookDelivery.organization_id == current.organization_id).order_by(WebhookDelivery.created_at.desc()).all()
-    return {"items": [{"id": item.id, "event": item.event_name, "destination": item.destination, "status": item.status, "attempts": item.attempts, "redacted_payload_preview": item.payload_preview, "failure_reason": item.failure_reason} for item in items]}
+def webhook_logs(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("providers:manage"))]
+) -> dict[str, Any]:
+    items = (
+        db.query(WebhookDelivery)
+        .filter(WebhookDelivery.organization_id == current.organization_id)
+        .order_by(WebhookDelivery.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "event": item.event_name,
+                "destination": item.destination,
+                "status": item.status,
+                "attempts": item.attempts,
+                "redacted_payload_preview": item.payload_preview,
+                "failure_reason": item.failure_reason,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.get(f"{settings.api_prefix}/security/overview")
-def security_overview(db: Db, current: Annotated[Principal, Depends(require_permissions("security:manage"))]) -> dict[str, Any]:
-    active_keys = db.query(ApiKey).filter(ApiKey.organization_id == current.organization_id, ApiKey.revoked_at.is_(None)).count()
-    recent_audits = db.query(AuditEvent).filter(AuditEvent.organization_id == current.organization_id).count()
-    return {"security_posture": "Security controls designed to support enterprise deployment.", "active_api_keys": active_keys, "request_id_headers": True, "rate_limiting": True, "cors_configured": True, "sensitive_export_auditing": True, "audit_events": recent_audits, "certification_claim": "No certification claim is made."}
+def security_overview(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("security:manage"))]
+) -> dict[str, Any]:
+    active_keys = (
+        db.query(ApiKey)
+        .filter(ApiKey.organization_id == current.organization_id, ApiKey.revoked_at.is_(None))
+        .count()
+    )
+    recent_audits = (
+        db.query(AuditEvent).filter(AuditEvent.organization_id == current.organization_id).count()
+    )
+    return {
+        "security_posture": "Security controls designed to support enterprise deployment.",
+        "active_api_keys": active_keys,
+        "request_id_headers": True,
+        "rate_limiting": True,
+        "cors_configured": True,
+        "sensitive_export_auditing": True,
+        "audit_events": recent_audits,
+        "certification_claim": "No certification claim is made.",
+    }
 
 
 @app.get(f"{settings.api_prefix}/security/api-keys")
-def list_api_keys(db: Db, current: Annotated[Principal, Depends(require_permissions("security:manage"))]) -> dict[str, Any]:
-    keys = db.query(ApiKey).filter(ApiKey.organization_id == current.organization_id).order_by(ApiKey.created_at.desc()).all()
-    return {"items": [{"id": key.id, "name": key.name, "prefix": key.key_prefix, "scopes": key.scopes, "expires_at": key.expires_at.isoformat() if key.expires_at else None, "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None, "revoked_at": key.revoked_at.isoformat() if key.revoked_at else None} for key in keys]}
+def list_api_keys(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("security:manage"))]
+) -> dict[str, Any]:
+    keys = (
+        db.query(ApiKey)
+        .filter(ApiKey.organization_id == current.organization_id)
+        .order_by(ApiKey.created_at.desc())
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": key.id,
+                "name": key.name,
+                "prefix": key.key_prefix,
+                "scopes": key.scopes,
+                "expires_at": key.expires_at.isoformat() if key.expires_at else None,
+                "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
+                "revoked_at": key.revoked_at.isoformat() if key.revoked_at else None,
+            }
+            for key in keys
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/security/api-keys", status_code=201)
-def create_api_key(payload: ApiKeyInput, db: Db, current: Annotated[Principal, Depends(require_permissions("security:manage"))]) -> dict[str, Any]:
+def create_api_key(
+    payload: ApiKeyInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("security:manage"))],
+) -> dict[str, Any]:
     from app.security import _hash_token
 
     raw = f"vr_{uuid4().hex}{uuid4().hex[:8]}"
@@ -1784,13 +2937,29 @@ def create_api_key(payload: ApiKeyInput, db: Db, current: Annotated[Principal, D
         expires_at=payload.expires_at,
     )
     db.add(key)
-    audit(db, current.organization_id, current.email, "api_key.created", "api_key", key.id, {"scopes": payload.scopes})
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "api_key.created",
+        "api_key",
+        key.id,
+        {"scopes": payload.scopes},
+    )
     db.commit()
-    return {"id": key.id, "api_key": raw, "warning": "Copy this value now. The demo returns it once and stores only a hash."}
+    return {
+        "id": key.id,
+        "api_key": raw,
+        "warning": "Copy this value now. The demo returns it once and stores only a hash.",
+    }
 
 
 @app.post(f"{settings.api_prefix}/security/api-keys/{{key_id}}/revoke")
-def revoke_api_key(key_id: str, db: Db, current: Annotated[Principal, Depends(require_permissions("security:manage"))]) -> dict[str, str]:
+def revoke_api_key(
+    key_id: str,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("security:manage"))],
+) -> dict[str, str]:
     key = require_org_record(db.get(ApiKey, key_id), current.organization_id, "API key")
     key.revoked_at = datetime.utcnow()
     audit(db, current.organization_id, current.email, "api_key.revoked", "api_key", key.id)
@@ -1799,31 +2968,98 @@ def revoke_api_key(key_id: str, db: Db, current: Annotated[Principal, Depends(re
 
 
 @app.get(f"{settings.api_prefix}/governance/retention-policies")
-def retention_policies(db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))]) -> dict[str, Any]:
-    items = db.query(RetentionPolicy).filter(RetentionPolicy.organization_id == current.organization_id).all()
-    return {"items": [{"id": item.id, "name": item.name, "resource_type": item.resource_type, "retention_days": item.retention_days, "action": item.action, "legal_hold_enabled": item.legal_hold_enabled} for item in items]}
+def retention_policies(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))]
+) -> dict[str, Any]:
+    items = (
+        db.query(RetentionPolicy)
+        .filter(RetentionPolicy.organization_id == current.organization_id)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "resource_type": item.resource_type,
+                "retention_days": item.retention_days,
+                "action": item.action,
+                "legal_hold_enabled": item.legal_hold_enabled,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/governance/retention-policies", status_code=201)
-def create_retention_policy(payload: RetentionInput, db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))]) -> dict[str, Any]:
-    policy = RetentionPolicy(id=f"retention-{uuid4().hex[:12]}", organization_id=current.organization_id, **payload.model_dump(), legal_hold_enabled=False)
+def create_retention_policy(
+    payload: RetentionInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("governance:manage"))],
+) -> dict[str, Any]:
+    policy = RetentionPolicy(
+        id=f"retention-{uuid4().hex[:12]}",
+        organization_id=current.organization_id,
+        **payload.model_dump(),
+        legal_hold_enabled=False,
+    )
     db.add(policy)
-    audit(db, current.organization_id, current.email, "retention_policy.created", "retention_policy", policy.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "retention_policy.created",
+        "retention_policy",
+        policy.id,
+    )
     db.commit()
     return {"id": policy.id, "name": policy.name}
 
 
 @app.get(f"{settings.api_prefix}/governance/deletion-requests")
-def deletion_requests(db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))]) -> dict[str, Any]:
-    items = db.query(DataDeletionRequest).filter(DataDeletionRequest.organization_id == current.organization_id).all()
-    return {"items": [{"id": item.id, "requester_reference": item.requester_reference, "scope": item.scope, "status": item.status, "reason": item.reason} for item in items]}
+def deletion_requests(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))]
+) -> dict[str, Any]:
+    items = (
+        db.query(DataDeletionRequest)
+        .filter(DataDeletionRequest.organization_id == current.organization_id)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "requester_reference": item.requester_reference,
+                "scope": item.scope,
+                "status": item.status,
+                "reason": item.reason,
+            }
+            for item in items
+        ]
+    }
 
 
 @app.post(f"{settings.api_prefix}/governance/deletion-requests", status_code=201)
-def create_deletion_request(payload: DeletionRequestInput, db: Db, current: Annotated[Principal, Depends(require_permissions("governance:manage"))]) -> dict[str, Any]:
-    request = DataDeletionRequest(id=f"deletion-{uuid4().hex[:12]}", organization_id=current.organization_id, **payload.model_dump(), status="pending_review")
+def create_deletion_request(
+    payload: DeletionRequestInput,
+    db: Db,
+    current: Annotated[Principal, Depends(require_permissions("governance:manage"))],
+) -> dict[str, Any]:
+    request = DataDeletionRequest(
+        id=f"deletion-{uuid4().hex[:12]}",
+        organization_id=current.organization_id,
+        **payload.model_dump(),
+        status="pending_review",
+    )
     db.add(request)
-    audit(db, current.organization_id, current.email, "deletion_request.created", "deletion_request", request.id)
+    audit(
+        db,
+        current.organization_id,
+        current.email,
+        "deletion_request.created",
+        "deletion_request",
+        request.id,
+    )
     db.commit()
     return {"id": request.id, "status": request.status}
 
@@ -1832,38 +3068,141 @@ def create_deletion_request(payload: DeletionRequestInput, db: Db, current: Anno
 
 
 @app.get(f"{settings.api_prefix}/search")
-def global_search(q: str, db: Db, current: Current, limit: int = Query(8, ge=1, le=20)) -> dict[str, Any]:
+def global_search(
+    q: str, db: Db, current: Current, limit: int = Query(8, ge=1, le=20)
+) -> dict[str, Any]:
     needle = f"%{q}%"
     results: list[dict[str, Any]] = []
-    for call in db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.caller_name.ilike(needle)).limit(limit).all():
-        results.append({"type": "call", "id": call.id, "title": redact_pii(call.caller_name), "meta": f"{call.status} · {call.outcome}", "status": call.status})
-    for lead in db.query(Lead).filter(Lead.organization_id == current.organization_id, Lead.name.ilike(needle)).limit(limit).all():
-        results.append({"type": "lead", "id": lead.id, "title": redact_pii(lead.name), "meta": f"{lead.status} · score {lead.score}", "status": lead.status})
-    for agent in db.query(VoiceAgent).filter(VoiceAgent.organization_id == current.organization_id, VoiceAgent.name.ilike(needle)).limit(limit).all():
-        results.append({"type": "agent", "id": agent.id, "title": agent.name, "meta": agent.use_case, "status": agent.status})
-    for report in db.query(Report).filter(Report.organization_id == current.organization_id, Report.title.ilike(needle)).limit(limit).all():
-        results.append({"type": "report", "id": report.id, "title": report.title, "meta": report.report_type, "status": "ready"})
-    for alert in db.query(Alert).filter(Alert.organization_id == current.organization_id, Alert.title.ilike(needle)).limit(limit).all():
-        results.append({"type": "alert", "id": alert.id, "title": alert.title, "meta": alert.category, "status": alert.status})
+    for call in (
+        db.query(CallSession)
+        .filter(
+            CallSession.organization_id == current.organization_id,
+            CallSession.caller_name.ilike(needle),
+        )
+        .limit(limit)
+        .all()
+    ):
+        results.append(
+            {
+                "type": "call",
+                "id": call.id,
+                "title": redact_pii(call.caller_name),
+                "meta": f"{call.status} · {call.outcome}",
+                "status": call.status,
+            }
+        )
+    for lead in (
+        db.query(Lead)
+        .filter(Lead.organization_id == current.organization_id, Lead.name.ilike(needle))
+        .limit(limit)
+        .all()
+    ):
+        results.append(
+            {
+                "type": "lead",
+                "id": lead.id,
+                "title": redact_pii(lead.name),
+                "meta": f"{lead.status} · score {lead.score}",
+                "status": lead.status,
+            }
+        )
+    for agent in (
+        db.query(VoiceAgent)
+        .filter(
+            VoiceAgent.organization_id == current.organization_id, VoiceAgent.name.ilike(needle)
+        )
+        .limit(limit)
+        .all()
+    ):
+        results.append(
+            {
+                "type": "agent",
+                "id": agent.id,
+                "title": agent.name,
+                "meta": agent.use_case,
+                "status": agent.status,
+            }
+        )
+    for report in (
+        db.query(Report)
+        .filter(Report.organization_id == current.organization_id, Report.title.ilike(needle))
+        .limit(limit)
+        .all()
+    ):
+        results.append(
+            {
+                "type": "report",
+                "id": report.id,
+                "title": report.title,
+                "meta": report.report_type,
+                "status": "ready",
+            }
+        )
+    for alert in (
+        db.query(Alert)
+        .filter(Alert.organization_id == current.organization_id, Alert.title.ilike(needle))
+        .limit(limit)
+        .all()
+    ):
+        results.append(
+            {
+                "type": "alert",
+                "id": alert.id,
+                "title": alert.title,
+                "meta": alert.category,
+                "status": alert.status,
+            }
+        )
     return {"items": results[:limit], "organization_id": current.organization_id}
 
 
 @app.get(f"{settings.api_prefix}/platform/operations")
-def platform_operations(db: Db, current: Annotated[Principal, Depends(require_permissions("workspace:manage"))]) -> dict[str, Any]:
-    providers = db.query(ProviderConfig).filter(ProviderConfig.organization_id == current.organization_id).all()
-    jobs = db.query(IntegrationJob).filter(IntegrationJob.organization_id == current.organization_id).all()
+def platform_operations(
+    db: Db, current: Annotated[Principal, Depends(require_permissions("workspace:manage"))]
+) -> dict[str, Any]:
+    providers = (
+        db.query(ProviderConfig)
+        .filter(ProviderConfig.organization_id == current.organization_id)
+        .all()
+    )
+    jobs = (
+        db.query(IntegrationJob)
+        .filter(IntegrationJob.organization_id == current.organization_id)
+        .all()
+    )
     return {
-        "health": {"api": "healthy", "database": "healthy", "redis": "configured_boundary", "websocket": "healthy", "simulation_engine": "healthy", "worker": "boundary_active"},
+        "health": {
+            "api": "healthy",
+            "database": "healthy",
+            "redis": "configured_boundary",
+            "websocket": "healthy",
+            "simulation_engine": "healthy",
+            "worker": "boundary_active",
+        },
         "telemetry": {
-            "calls_processed": db.query(CallSession).filter(CallSession.organization_id == current.organization_id).count(),
-            "active_calls": db.query(CallSession).filter(CallSession.organization_id == current.organization_id, CallSession.status.in_(["queued", "ringing", "connected", "listening", "reasoning", "speaking"])) .count(),
+            "calls_processed": db.query(CallSession)
+            .filter(CallSession.organization_id == current.organization_id)
+            .count(),
+            "active_calls": db.query(CallSession)
+            .filter(
+                CallSession.organization_id == current.organization_id,
+                CallSession.status.in_(
+                    ["queued", "ringing", "connected", "listening", "reasoning", "speaking"]
+                ),
+            )
+            .count(),
             "average_event_stream_latency_ms": 160,
-            "crm_job_queue": len([job for job in jobs if job.job_type == "crm_sync" and job.status != "succeeded"]),
+            "crm_job_queue": len(
+                [job for job in jobs if job.job_type == "crm_sync" and job.status != "succeeded"]
+            ),
             "report_queue": 0,
             "provider_failures": sum(provider.failure_count for provider in providers),
             "synthetic_demo_cost_estimate_usd": 42.80,
         },
-        "notes": ["Redis and worker status are architectural boundaries in local SQLite mode.", "No carrier or external provider status is claimed."],
+        "notes": [
+            "Redis and worker status are architectural boundaries in local SQLite mode.",
+            "No carrier or external provider status is claimed.",
+        ],
     }
 
 
@@ -1876,14 +3215,17 @@ def readiness(db: Db) -> dict[str, Any]:
         "organizations": orgs,
         "migration_boundary": "alembic",
         "sqlite_development_mode": settings.database_url.startswith("sqlite"),
-        "production_sqlite_allowed": settings.environment == "development" or not settings.database_url.startswith("sqlite"),
+        "production_sqlite_allowed": settings.environment == "development"
+        or not settings.database_url.startswith("sqlite"),
     }
 
 
 @app.get(f"{settings.api_prefix}/platform/database")
 def database_status(db: Db, current: Current) -> dict[str, Any]:
     return {
-        "database_url_mode": "sqlite" if settings.database_url.startswith("sqlite") else "postgresql",
+        "database_url_mode": "sqlite"
+        if settings.database_url.startswith("sqlite")
+        else "postgresql",
         "tables_ready": True,
         "organizations": db.query(Organization).count(),
         "calls": db.query(CallSession).count(),
@@ -1899,9 +3241,37 @@ def trace_view(call_id: str, db: Db, current: Current) -> dict[str, Any]:
     return {
         "trace_id": call.metadata_json.get("trace_id", f"trace-{call.id}"),
         "call": call_dict(call),
-        "events": [e.payload | {"id": e.id, "event_type": e.event_type} for e in db.query(CallEvent).filter(CallEvent.call_id == call.id, CallEvent.organization_id == current.organization_id).order_by(CallEvent.occurred_at).all()],
-        "transcripts": db.query(TranscriptSegment).filter(TranscriptSegment.call_id == call.id).count(),
-        "entities": db.query(ExtractedEntity).filter(ExtractedEntity.call_id == call.id, ExtractedEntity.organization_id == current.organization_id).count(),
-        "crm_jobs": [job_dict(j) for j in db.query(IntegrationJob).filter(IntegrationJob.organization_id == current.organization_id, IntegrationJob.entity_type == "lead").limit(10).all()],
-        "audit_events": db.query(AuditEvent).filter(AuditEvent.organization_id == current.organization_id, AuditEvent.entity_id == call.id).count(),
+        "events": [
+            e.payload | {"id": e.id, "event_type": e.event_type}
+            for e in db.query(CallEvent)
+            .filter(
+                CallEvent.call_id == call.id, CallEvent.organization_id == current.organization_id
+            )
+            .order_by(CallEvent.occurred_at)
+            .all()
+        ],
+        "transcripts": db.query(TranscriptSegment)
+        .filter(TranscriptSegment.call_id == call.id)
+        .count(),
+        "entities": db.query(ExtractedEntity)
+        .filter(
+            ExtractedEntity.call_id == call.id,
+            ExtractedEntity.organization_id == current.organization_id,
+        )
+        .count(),
+        "crm_jobs": [
+            job_dict(j)
+            for j in db.query(IntegrationJob)
+            .filter(
+                IntegrationJob.organization_id == current.organization_id,
+                IntegrationJob.entity_type == "lead",
+            )
+            .limit(10)
+            .all()
+        ],
+        "audit_events": db.query(AuditEvent)
+        .filter(
+            AuditEvent.organization_id == current.organization_id, AuditEvent.entity_id == call.id
+        )
+        .count(),
     }

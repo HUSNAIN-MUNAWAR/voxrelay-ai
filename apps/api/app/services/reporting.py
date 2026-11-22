@@ -10,7 +10,9 @@ from app.db import Alert, CallSession, Notification, QualityEvaluation, Report
 
 
 def generate_report(db: Session, organization_id: str, report_type: str, actor: str) -> Report:
-    total_calls = db.query(CallSession).filter(CallSession.organization_id == organization_id).count()
+    total_calls = (
+        db.query(CallSession).filter(CallSession.organization_id == organization_id).count()
+    )
     average_quality = (
         db.query(func.avg(QualityEvaluation.quality_score))
         .join(CallSession, CallSession.id == QualityEvaluation.call_id)
@@ -18,7 +20,11 @@ def generate_report(db: Session, organization_id: str, report_type: str, actor: 
         .scalar()
         or 0
     )
-    open_alerts = db.query(Alert).filter(Alert.organization_id == organization_id, Alert.status == "open").count()
+    open_alerts = (
+        db.query(Alert)
+        .filter(Alert.organization_id == organization_id, Alert.status == "open")
+        .count()
+    )
     report = Report(
         id=f"report-{uuid4().hex[:12]}",
         organization_id=organization_id,
@@ -57,8 +63,12 @@ def generate_report(db: Session, organization_id: str, report_type: str, actor: 
 
 def minimal_pdf(title: str, body: str) -> bytes:
     """Generate a tiny text-only PDF without claiming a full document rendering service."""
-    safe_title = title.replace("(", "[").replace(")", "]").encode("ascii", "replace").decode("ascii")[:96]
-    safe_body = body.replace("(", "[").replace(")", "]").encode("ascii", "replace").decode("ascii")[:500]
+    safe_title = (
+        title.replace("(", "[").replace(")", "]").encode("ascii", "replace").decode("ascii")[:96]
+    )
+    safe_body = (
+        body.replace("(", "[").replace(")", "]").encode("ascii", "replace").decode("ascii")[:500]
+    )
     stream = f"BT /F1 16 Tf 50 760 Td ({safe_title}) Tj 0 -28 Td /F1 10 Tf ({safe_body}) Tj ET"
     objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",

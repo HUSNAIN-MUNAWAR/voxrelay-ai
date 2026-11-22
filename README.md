@@ -15,6 +15,27 @@ VoxRelay AI is a runnable FastAPI and Next.js monorepo that demonstrates how voi
 
 All demo records, users, organizations, transcripts, and screenshots in this repository are synthetic sample data generated for local demonstration.
 
+## Measured local voice runtime
+
+The repository's default call path remains deterministic and provider-free. On Windows, an optional evidence workflow exercises the real local domain path, then uses the installed Windows System.Speech `Microsoft Zira Desktop` voice to synthesize the persisted synthetic transcript into a genuine PCM WAV. It also renders a waveform/event animation from that WAV and the ordered call events.
+
+Reproduce it after installing the API development dependencies:
+
+```powershell
+py -3.12 -m pip install -e "apps/api[dev]"
+py -3.12 scripts/verification/generate_runtime_evidence.py
+```
+
+Artifacts from the measured Windows run:
+
+- [Generated WAV](docs/runtime_evidence/voxrelay-sapi-call.wav)
+- [Waveform and event animation](docs/runtime_evidence/voxrelay-call-runtime-animation.mp4)
+- [Runtime poster](docs/runtime_evidence/voxrelay-call-runtime-poster.jpg)
+- [Ordered event trace](docs/runtime_evidence/voxrelay-call-event-trace.csv)
+- [Hashable runtime summary and claim boundary](docs/runtime_evidence/voxrelay-runtime-summary.json)
+
+This evidence is intentionally not described as neural TTS, STT, telephony, LLM inference, or a production benchmark. The simulator data is synthetic, the Windows voice is an OS speech engine, the animation has no audio track, and the default provider adapters remain mock/local as documented in [docs/provider-adapters.md](docs/provider-adapters.md).
+
 ## Why this project exists
 
 Voice systems often look convincing in isolated happy-path demos while hiding the harder operational problems: unclear handoffs, invisible state transitions, weak release controls, and poor auditability. VoxRelay AI exists to show a more credible product shape:

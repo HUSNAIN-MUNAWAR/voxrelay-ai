@@ -5,6 +5,7 @@ persisted database job records and processes only local mock work. Redis remains
 future broker boundary; production deployments should replace the loop with a
 supervised task system (Celery, Dramatiq, RQ, Arq, etc.) and observability.
 """
+
 from __future__ import annotations
 
 import logging
@@ -40,11 +41,16 @@ def process_due_work() -> dict[str, int]:
 
         due_reports = (
             db.query(ScheduledReport)
-            .filter(ScheduledReport.is_active.is_(True), ScheduledReport.next_run_at <= datetime.utcnow())
+            .filter(
+                ScheduledReport.is_active.is_(True),
+                ScheduledReport.next_run_at <= datetime.utcnow(),
+            )
             .all()
         )
         for schedule in due_reports:
-            generate_report(db, schedule.organization_id, schedule.report_type, "voxrelay.local_worker")
+            generate_report(
+                db, schedule.organization_id, schedule.report_type, "voxrelay.local_worker"
+            )
             schedule.next_run_at = datetime.utcnow().replace(microsecond=0)
             db.commit()
             reports += 1

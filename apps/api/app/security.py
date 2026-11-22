@@ -21,17 +21,51 @@ bearer_scheme = HTTPBearer(auto_error=False)
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "platform_admin": {"*"},
     "organization_admin": {
-        "workspace:manage", "users:manage", "calls:read", "calls:transfer", "calls:takeover",
-        "agents:manage", "agents:approve", "agents:activate", "quality:review", "leads:manage",
-        "calendar:manage", "routing:manage", "reports:manage", "governance:manage", "security:manage",
-        "providers:manage", "analytics:read",
+        "workspace:manage",
+        "users:manage",
+        "calls:read",
+        "calls:transfer",
+        "calls:takeover",
+        "agents:manage",
+        "agents:approve",
+        "agents:activate",
+        "quality:review",
+        "leads:manage",
+        "calendar:manage",
+        "routing:manage",
+        "reports:manage",
+        "governance:manage",
+        "security:manage",
+        "providers:manage",
+        "analytics:read",
     },
     "operations_manager": {
-        "calls:read", "calls:transfer", "calls:takeover", "agents:manage", "leads:manage",
-        "calendar:manage", "routing:manage", "reports:manage", "analytics:read", "quality:review",
+        "calls:read",
+        "calls:transfer",
+        "calls:takeover",
+        "agents:manage",
+        "leads:manage",
+        "calendar:manage",
+        "routing:manage",
+        "reports:manage",
+        "analytics:read",
+        "quality:review",
     },
-    "voice_agent_manager": {"agents:manage", "agents:submit", "calls:read", "analytics:read", "quality:review"},
-    "supervisor": {"calls:read", "calls:transfer", "calls:takeover", "leads:manage", "routing:read", "quality:review"},
+    "voice_agent_manager": {
+        "agents:manage",
+        "agents:submit",
+        "calls:read",
+        "analytics:read",
+        "quality:review",
+    },
+    "supervisor": {
+        "calls:read",
+        "calls:transfer",
+        "calls:takeover",
+        "leads:manage",
+        "routing:read",
+        "quality:review",
+    },
     "quality_reviewer": {"calls:read", "quality:review", "quality:manage", "analytics:read"},
     "sales_representative": {"calls:read", "leads:manage", "calendar:read"},
     "scheduler": {"calendar:manage", "calls:read", "leads:read"},
@@ -94,11 +128,15 @@ def create_refresh_session(db: Session, user: User, organization_id: str) -> str
 def rotate_refresh_session(db: Session, raw_token: str) -> tuple[User, str, str]:
     session = (
         db.query(RefreshSession)
-        .filter(RefreshSession.token_hash == _hash_token(raw_token), RefreshSession.revoked_at.is_(None))
+        .filter(
+            RefreshSession.token_hash == _hash_token(raw_token), RefreshSession.revoked_at.is_(None)
+        )
         .first()
     )
     if not session or session.expires_at <= datetime.utcnow():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh session is invalid or expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh session is invalid or expired"
+        )
     session.revoked_at = datetime.utcnow()
     user = db.get(User, session.user_id)
     if not user or not user.is_active:
@@ -113,13 +151,21 @@ def rotate_refresh_session(db: Session, raw_token: str) -> tuple[User, str, str]
         .first()
     )
     if not membership:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace membership no longer exists")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Workspace membership no longer exists"
+        )
     db.commit()
-    return user, create_access_token(user, session.organization_id, membership.role), create_refresh_session(db, user, session.organization_id)
+    return (
+        user,
+        create_access_token(user, session.organization_id, membership.role),
+        create_refresh_session(db, user, session.organization_id),
+    )
 
 
 def revoke_refresh_session(db: Session, raw_token: str) -> None:
-    session = db.query(RefreshSession).filter(RefreshSession.token_hash == _hash_token(raw_token)).first()
+    session = (
+        db.query(RefreshSession).filter(RefreshSession.token_hash == _hash_token(raw_token)).first()
+    )
     if session and session.revoked_at is None:
         session.revoked_at = datetime.utcnow()
         db.commit()
@@ -139,7 +185,9 @@ def _principal_from_token(token: str, db: Session) -> Principal:
         user_id = str(payload.get("sub"))
         org_id = str(payload.get("org"))
     except (JWTError, ValueError) as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token"
+        ) from exc
     user = db.get(User, user_id)
     membership = (
         db.query(OrganizationMembership)
@@ -151,7 +199,9 @@ def _principal_from_token(token: str, db: Session) -> Principal:
         .first()
     )
     if not user or not user.is_active or not membership:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Workspace access is unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Workspace access is unavailable"
+        )
     return Principal(
         user_id=user.id,
         email=user.email,
@@ -163,7 +213,9 @@ def _principal_from_token(token: str, db: Session) -> Principal:
 
 def _principal_from_api_key(raw_key: str, db: Session) -> Principal | None:
     prefix = raw_key[:12]
-    candidates = db.query(ApiKey).filter(ApiKey.key_prefix == prefix, ApiKey.revoked_at.is_(None)).all()
+    candidates = (
+        db.query(ApiKey).filter(ApiKey.key_prefix == prefix, ApiKey.revoked_at.is_(None)).all()
+    )
     for api_key in candidates:
         if api_key.expires_at and api_key.expires_at <= datetime.utcnow():
             continue
@@ -192,12 +244,16 @@ def get_principal(
             return principal
     if credentials and credentials.scheme.lower() == "bearer":
         return _principal_from_token(credentials.credentials, db)
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required")
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication is required"
+    )
 
 
 def require_permissions(*required: str):
     def dependency(principal: Annotated[Principal, Depends(get_principal)]) -> Principal:
-        missing = [permission for permission in required if not has_permission(principal, permission)]
+        missing = [
+            permission for permission in required if not has_permission(principal, permission)
+        ]
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
