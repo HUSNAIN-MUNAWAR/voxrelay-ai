@@ -1506,9 +1506,18 @@ async def websocket_call(websocket: WebSocket, call_id: str, token: str | None =
             )
             await websocket.close(code=4401)
             return
-        from app.security import _principal_from_token
+        from app.security import _principal_from_token, has_permission
 
-        principal = _principal_from_token(token, db)
+        try:
+            principal = _principal_from_token(token, db)
+        except HTTPException:
+            await websocket.send_json({"type": "error", "detail": "Invalid workspace credentials"})
+            await websocket.close(code=4401)
+            return
+        if not has_permission(principal, "calls:read"):
+            await websocket.send_json({"type": "error", "detail": "Call read permission is required"})
+            await websocket.close(code=4403)
+            return
         call = db.get(CallSession, call_id)
         if not call or call.organization_id != principal.organization_id:
             await websocket.send_json({"type": "error", "detail": "Call not found"})
